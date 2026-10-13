@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { --canvas: 247 248 250; --panel: 255 255 255; --ink: 32 33 43; --quiet: 146 149 161; --line: 236 238 241; }
+  .dark { --canvas: 17 18 23; --panel: 25 26 33; --ink: 236 236 241; --quiet: 136 139 153; --line: 43 45 54; color-scheme: dark; }
+  body { @apply m-0 min-w-[360px] bg-canvas font-sans text-ink antialiased; }
+  button { @apply text-inherit; }
+}
