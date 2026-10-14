@@ -7,7 +7,9 @@ export async function createWorkspace(
   input: CreateWorkspaceInput,
   authUser: SupabaseUser,
 ) {
-  if (!authUser.email) {
+  const email = authUser.email
+
+  if (!email) {
     throw new Error('Your Supabase account must have an email address')
   }
 
@@ -22,10 +24,10 @@ export async function createWorkspace(
   return prisma.$transaction(async (transaction) => {
     const appUser = await transaction.user.upsert({
       where: { id: authUser.id },
-      update: { email: authUser.email },
+      update: { email },
       create: {
         id: authUser.id,
-        email: authUser.email,
+        email,
         displayName:
           typeof authUser.user_metadata?.full_name === 'string'
             ? authUser.user_metadata.full_name
