@@ -29,6 +29,7 @@ model Workspace {
   slug      String            @unique
   createdAt DateTime          @default(now())
   members   WorkspaceMember[]
+  projects  Project[]
 }
 
 model WorkspaceMember {
@@ -42,5 +43,20 @@ model WorkspaceMember {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String
+  description String?
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, slug])
   @@index([workspaceId])
 }

@@ -51,3 +51,28 @@ export async function createWorkspace(
     })
   })
 }
+
+export async function listWorkspacesForUser(userId: string) {
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { userId },
+    select: {
+      role: true,
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  })
+
+  return memberships.map(({ role, workspace }) => ({
+    ...workspace,
+    role,
+  }))
+}

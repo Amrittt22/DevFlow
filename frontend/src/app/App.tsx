@@ -1,9 +1,14 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Activity, AlignLeft, Bell, CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, CirclePlus, Command, FileText, Filter, FolderKanban, Home, Inbox, LayoutGrid, List, LogOut, Moon, MoreHorizontal, Search, Settings, Share2, SlidersHorizontal, Sun, Users, X } from 'lucide-react'
 import AuthPage from '../features/auth/AuthPage'
 import { useAuth } from '../features/auth/AuthContext'
 import { signOut } from '../services/auth.service'
-import { fetchCurrentUserFromBackend } from '../services/api.service'
+import {
+  createWorkspaceInBackend,
+  fetchWorkspacesFromBackend,
+  fetchCurrentUserFromBackend,
+  type Workspace,
+} from '../services/api.service'
 
 const events = [
   { icon: CirclePlus, tone: 'violet', title: 'Maya Chen created a task', detail: 'Add keyboard shortcuts to the task board', time: '12 min ago', initials: 'MC', avatar: 'bg-orange-200 text-orange-900', project: 'Product' },
@@ -25,8 +30,60 @@ export default function App() {
   const [filter, setFilter] = useState(false)
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
+  const [workspaceModalOpen, setWorkspaceModalOpen] = useState(false)
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true)
+ const [activeWorkspaceId, setActiveWorkspaceId] = useState(
+  () => localStorage.getItem('devflow-active-workspace') ?? '',
+)
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
+    workspaces[0]
   const shown = events.filter((event) => `${event.title} ${event.detail} ${event.project}`.toLowerCase().includes(query.toLowerCase()))
   const notify = (message: string) => setNotice(message)
+  useEffect(() => {
+    if (isLoading || !user) return
+
+    let cancelled = false
+    setIsLoadingWorkspaces(true)
+
+    fetchWorkspacesFromBackend()
+      .then((loadedWorkspaces) => {
+  if (!cancelled) {
+    const savedWorkspaceId = localStorage.getItem('devflow-active-workspace')
+    const selectedWorkspaceId = loadedWorkspaces.some(
+      (workspace) => workspace.id === savedWorkspaceId,
+    )
+      ? savedWorkspaceId!
+      : loadedWorkspaces[0]?.id ?? ''
+
+    setWorkspaces(loadedWorkspaces)
+    setActiveWorkspaceId(selectedWorkspaceId)
+
+    if (selectedWorkspaceId) {
+      localStorage.setItem('devflow-active-workspace', selectedWorkspaceId)
+    } else {
+      localStorage.removeItem('devflow-active-workspace')
+    }
+  }
+})
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          notify(
+            error instanceof Error ? error.message : 'Could not load workspaces',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingWorkspaces(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isLoading, user?.id])
   function toggleTheme() { const next = !dark; setDark(next); localStorage.setItem('devflow-theme', next ? 'dark' : 'light') }
   async function handleSignOut() {
     const { error } = await signOut()
@@ -40,6 +97,26 @@ export default function App() {
       notify(
         error instanceof Error ? error.message : 'Backend request failed',
       )
+    }
+  }
+  async function handleCreateWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsCreatingWorkspace(true)
+
+    try {
+      const workspace = await createWorkspaceInBackend(workspaceName)
+      setWorkspaces((currentWorkspaces) => [...currentWorkspaces, workspace])
+      setActiveWorkspaceId(workspace.id)
+      localStorage.setItem('devflow-active-workspace', workspace.id)
+      notify(`Workspace "${workspace.name}" created`)
+      setWorkspaceModalOpen(false)
+      setWorkspaceName('')
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : 'Could not create workspace',
+      )
+    } finally {
+      setIsCreatingWorkspace(false)
     }
   }
 
@@ -57,7 +134,31 @@ export default function App() {
         <button className="mb-5 flex h-12 items-center gap-2.5 rounded-lg border border-line px-2 text-left max-[680px]:justify-center max-[680px]:border-0 max-[680px]:px-0"><span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-orange-400 to-rose-500 font-display text-base font-extrabold text-white">D</span><span className="flex min-w-0 flex-1 flex-col max-[680px]:hidden"><strong className="text-xs">DevFlow Studio</strong><small className="text-[10px] text-quiet">devflow.team</small></span><ChevronDown size={15} className="text-quiet max-[680px]:hidden" /></button>
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-0.5 border-b border-line pb-4">{navItems.map(({ label, icon: Icon, count }) => <button key={label} onClick={() => setActiveNav(label)} className={`flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs transition hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center max-[680px]:px-0 ${activeNav === label ? 'bg-brand-soft font-semibold text-brand dark:bg-violet-950/60 dark:text-violet-300' : 'text-quiet'}`}><Icon size={17} /><span className="flex-1 max-[680px]:hidden">{label}</span>{count && <small className="text-[10px] max-[680px]:hidden">{count}</small>}</button>)}</div>
-          <SideSection title="WORKSPACE" onAdd={() => notify('Workspace tools are coming soon')}><SideLink icon={FolderKanban} label="Project board" onClick={() => notify('Your project board is ready')} /><SideLink icon={FileText} label="Templates" onClick={() => notify('Templates are coming soon')} /><SideLink icon={CalendarDays} label="Upcoming projects" count="12" onClick={() => notify('Showing upcoming projects')} /><SideLink icon={Users} label="Team members" count="8" onClick={() => notify('Showing all team members')} /></SideSection>
+          <SideSection title="WORKSPACE" onAdd={() => { setWorkspaceName(''); setWorkspaceModalOpen(true) }}><SideLink icon={FolderKanban} label="Project board" onClick={() => notify('Your project board is ready')} /><SideLink icon={FileText} label="Templates" onClick={() => notify('Templates are coming soon')} /><SideLink icon={CalendarDays} label="Upcoming projects" count="12" onClick={() => notify('Showing upcoming projects')} /><SideLink icon={Users} label="Team members" count="8" onClick={() => notify('Showing all team members')} /></SideSection>
+          <SideSection title="YOUR WORKSPACES" onAdd={() => { setWorkspaceName(''); setWorkspaceModalOpen(true) }}>
+            {isLoadingWorkspaces ? (
+              <p className="px-2.5 py-2 text-[10px] text-quiet max-[680px]:hidden">Loading workspaces…</p>
+            ) : workspaces.length ? (
+              workspaces.map((workspace, index) => {
+                const colors = ['violet', 'orange', 'blue', 'green', 'pink']
+                return (
+                  <button
+                    key={workspace.id}
+                    onClick={() => {
+                      setActiveWorkspaceId(workspace.id)
+                      localStorage.setItem('devflow-active-workspace', workspace.id)
+                    }}
+                    className={`flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center max-[680px]:px-0 ${activeWorkspace?.id === workspace.id ? 'bg-brand-soft font-semibold text-brand dark:bg-violet-950/60 dark:text-violet-300' : 'text-quiet'}`}
+                  >
+                    <ProjectGlyph color={colors[index % colors.length]} />
+                    <span className="flex-1 truncate max-[680px]:hidden">{workspace.name}</span>
+                  </button>
+                )
+              })
+            ) : (
+              <p className="px-2.5 py-2 text-[10px] text-quiet max-[680px]:hidden">No workspaces yet</p>
+            )}
+          </SideSection>
           <SideSection title="YOUR PROJECTS" onAdd={() => notify('New project creation is coming soon')}>{projects.map((project) => <button key={project.name} onClick={() => notify(`${project.name} selected`)} className={`flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center max-[680px]:px-0 ${project.name === 'Product' ? 'bg-black/[.04] font-semibold dark:bg-white/[.05]' : 'text-quiet'}`}><ProjectGlyph color={project.color} /><span className="flex-1 max-[680px]:hidden">{project.name}</span><small className="text-[10px] text-quiet max-[680px]:hidden">{project.count}</small></button>)}</SideSection>
         </div>
         <div className="border-t border-line pt-2"><div className="flex items-center gap-2 rounded-md px-1.5 py-2"><Avatar initials={user.email?.slice(0, 2).toUpperCase() ?? 'U'} color="bg-violet-800 text-white" /><span className="flex-1 truncate max-[680px]:hidden"><strong className="block truncate text-xs">{user.email ?? 'Signed in'}</strong><small className="text-[10px] text-quiet">Workspace member</small></span><button aria-label="Account settings" onClick={() => notify('Account settings are coming soon')} className="text-quiet max-[680px]:hidden"><MoreHorizontal size={18} /></button></div><div className="flex gap-4 px-2 py-2 max-[680px]:flex-col max-[680px]:items-center max-[680px]:gap-3 max-[680px]:px-0"><SmallIcon label="Help" onClick={() => notify('Help center is coming soon')}><CircleHelp size={17} /></SmallIcon><SmallIcon label={dark ? 'Light mode' : 'Dark mode'} onClick={toggleTheme}>{dark ? <Sun size={17} /> : <Moon size={17} />}</SmallIcon><SmallIcon label="Settings" onClick={() => notify('Settings are coming soon')}><Settings size={17} /></SmallIcon></div><button aria-label="Sign out" onClick={() => void handleSignOut()} className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-2 text-[11px] text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center"><LogOut size={16} /><span className="max-[680px]:hidden">Sign out</span></button><button type="button" onClick={() => void checkBackendConnection()} className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-2 text-[11px] text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center"><Activity size={16} /><span className="max-[680px]:hidden">Check backend connection</span></button></div>
@@ -65,11 +166,11 @@ export default function App() {
 
       <main className="min-w-0 flex-1">
         <header className="sticky top-0 z-10 flex h-[68px] items-center justify-between border-b border-line bg-panel px-8 max-[900px]:px-6 max-[680px]:h-[58px] max-[680px]:px-3.5">
-          <div className="flex items-center gap-3 text-[11px] text-quiet max-[680px]:gap-2"><button className="hidden rounded-md p-1.5 hover:bg-black/5 max-[680px]:grid" aria-label="Open navigation"><AlignLeft size={18} /></button><span className="max-[680px]:hidden">Projects</span><ChevronRight className="max-[680px]:hidden" size={14} /><span className="flex items-center gap-1.5"><ProjectGlyph color="violet" small />Product</span><ChevronRight size={14} /><strong className="text-ink">Activity</strong></div>
+          <div className="flex items-center gap-3 text-[11px] text-quiet max-[680px]:gap-2"><button className="hidden rounded-md p-1.5 hover:bg-black/5 max-[680px]:grid" aria-label="Open navigation"><AlignLeft size={18} /></button><span className="max-[680px]:hidden">Workspaces</span><ChevronRight className="max-[680px]:hidden" size={14} /><span className="flex items-center gap-1.5"><ProjectGlyph color="violet" small />{activeWorkspace?.name ?? 'No workspace selected'}</span><ChevronRight size={14} /><strong className="text-ink">Activity</strong></div>
           <div className="flex items-center gap-4 max-[680px]:gap-2"><label className="flex h-[34px] w-[218px] items-center gap-2 rounded-lg border border-line px-2.5 text-quiet max-[680px]:w-8 max-[680px]:justify-center max-[680px]:border-0 max-[680px]:px-0"><Search size={16} /><input aria-label="Search activity" placeholder="Search anything..." value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent text-[11px] text-ink outline-none placeholder:text-quiet max-[680px]:hidden" /><kbd className="flex items-center gap-0.5 rounded border border-line px-1 text-[9px] max-[680px]:hidden"><Command size={11} />K</kbd></label><button aria-label="Notifications" onClick={() => notify('You’re all caught up')} className="relative text-quiet"><Bell size={18} /><i className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full border border-panel bg-orange-400" /></button><Avatar initials="AM" color="bg-violet-800 text-white" /></div>
         </header>
         <div className="mx-auto max-w-[1120px] px-[42px] max-[900px]:px-[26px] max-[680px]:px-[17px] max-[420px]:px-3">
-          <div className="flex min-h-[125px] items-center justify-between gap-5 pt-2 max-[680px]:min-h-[110px]"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-panel text-2xl text-brand shadow-soft max-[680px]:h-[34px] max-[680px]:w-[34px]">✳</div><div><div className="flex items-center gap-2.5"><h1 className="font-display text-[21px] font-bold tracking-tight max-[680px]:text-lg">Product</h1><button className="flex items-center gap-1.5 rounded-full border border-line bg-panel px-2 py-1 text-[10px] text-quiet"><i className="h-1.5 w-1.5 rounded-full bg-emerald-400" />On track<ChevronDown size={13} /></button></div><p className="mt-1 text-[11px] text-quiet max-[680px]:max-w-[180px]">Everything your team is building, in one place.</p></div></div><div className="flex items-center gap-3 max-[680px]:gap-1"><div className="flex -space-x-2 max-[680px]:hidden">{[['MC', 'bg-orange-200 text-orange-900'], ['AP', 'bg-emerald-200 text-emerald-900'], ['NK', 'bg-indigo-200 text-indigo-900'], ['SG', 'bg-pink-200 text-pink-900']].map(([n, c]) => <Avatar key={n} initials={n} color={c} />)}<span className="grid h-7 w-7 place-items-center rounded-full border-2 border-panel bg-brand text-[9px] font-bold text-white">+4</span></div><button onClick={() => notify('Share link copied')} className="flex h-[34px] items-center gap-1.5 rounded-md border border-line bg-panel px-3 text-[11px] font-semibold text-quiet hover:bg-black/[.03] dark:hover:bg-white/[.05]"><Share2 size={15} />Share</button><button aria-label="More project options" onClick={() => notify('More project options')} className="grid h-[30px] w-[30px] place-items-center rounded-md border border-line text-quiet"><MoreHorizontal size={19} /></button></div></div>
+          <div className="flex min-h-[125px] items-center justify-between gap-5 pt-2 max-[680px]:min-h-[110px]"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-panel text-2xl text-brand shadow-soft max-[680px]:h-[34px] max-[680px]:w-[34px]">✳</div><div><div className="flex items-center gap-2.5"><h1 className="font-display text-[21px] font-bold tracking-tight max-[680px]:text-lg">{activeWorkspace?.name ?? 'Create your first workspace'}</h1><button className="flex items-center gap-1.5 rounded-full border border-line bg-panel px-2 py-1 text-[10px] text-quiet"><i className="h-1.5 w-1.5 rounded-full bg-emerald-400" />On track<ChevronDown size={13} /></button></div><p className="mt-1 text-[11px] text-quiet max-[680px]:max-w-[180px]">Everything your team is building, in one place.</p></div></div><div className="flex items-center gap-3 max-[680px]:gap-1"><div className="flex -space-x-2 max-[680px]:hidden">{[['MC', 'bg-orange-200 text-orange-900'], ['AP', 'bg-emerald-200 text-emerald-900'], ['NK', 'bg-indigo-200 text-indigo-900'], ['SG', 'bg-pink-200 text-pink-900']].map(([n, c]) => <Avatar key={n} initials={n} color={c} />)}<span className="grid h-7 w-7 place-items-center rounded-full border-2 border-panel bg-brand text-[9px] font-bold text-white">+4</span></div><button onClick={() => notify('Share link copied')} className="flex h-[34px] items-center gap-1.5 rounded-md border border-line bg-panel px-3 text-[11px] font-semibold text-quiet hover:bg-black/[.03] dark:hover:bg-white/[.05]"><Share2 size={15} />Share</button><button aria-label="More project options" onClick={() => notify('More project options')} className="grid h-[30px] w-[30px] place-items-center rounded-md border border-line text-quiet"><MoreHorizontal size={19} /></button></div></div>
           <nav className="flex h-[47px] items-stretch gap-6 overflow-x-auto border-b border-line max-[680px]:gap-4" aria-label="Project sections">{tabs.map(({ label, icon: Icon }) => <button key={label} onClick={() => setActiveTab(label)} className={`relative flex shrink-0 items-center gap-1.5 text-[11px] ${activeTab === label ? 'font-semibold text-brand after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded after:bg-brand' : 'text-quiet hover:text-ink'}`}><Icon size={15} />{label}{label === 'Activity' && <em className="rounded bg-brand-soft px-1.5 py-0.5 text-[9px] not-italic text-brand dark:bg-violet-950">12</em>}</button>)}<button className="text-quiet" aria-label="Add tab" onClick={() => notify('Custom tabs are coming soon')}><CirclePlus size={17} /></button></nav>
           {activeTab === 'Activity' ? <section className="max-w-[850px] pt-7"><div className="flex items-center justify-between"><div><h2 className="flex items-center gap-2 font-display text-[15px] font-bold"><Activity size={17} className="text-brand" />Activity</h2><p className="ml-[26px] mt-1.5 text-[11px] text-quiet">Catch up on what’s happening across your project.</p></div><button onClick={() => setFilter(!filter)} className={`flex h-[31px] items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 text-[10px] text-quiet hover:bg-black/[.03] dark:hover:bg-white/[.05] ${filter ? 'text-brand' : ''}`}><Filter size={15} />Filter{filter && <span className="grid h-4 w-4 place-items-center rounded-full bg-brand text-[9px] text-white">1</span>}</button></div>
             {filter && <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] text-quiet"><span>Showing activity from</span>{['Everyone', 'All activity'].map((x) => <button key={x} onClick={() => setFilter(false)} className="flex items-center gap-1 rounded bg-brand-soft px-2 py-1.5 text-brand dark:bg-violet-950">{x}<X size={13} /></button>)}<button onClick={() => setFilter(false)}>Clear filters</button></div>}
@@ -81,6 +182,66 @@ export default function App() {
         </div>
       </main>
     </div>
+    {workspaceModalOpen && (
+      <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4">
+        <form
+          onSubmit={(event) => void handleCreateWorkspace(event)}
+          className="w-full max-w-md rounded-xl border border-line bg-panel p-5 shadow-xl"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="font-display text-lg font-bold">Create a workspace</h2>
+              <p className="mt-1 text-sm text-quiet">
+                Give your team a shared place to organize work.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWorkspaceModalOpen(false)}
+              className="text-quiet hover:text-ink"
+              aria-label="Close dialog"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <label
+            htmlFor="workspace-name"
+            className="mt-5 block text-sm font-medium"
+          >
+            Workspace name
+          </label>
+          <input
+            id="workspace-name"
+            autoFocus
+            minLength={2}
+            maxLength={80}
+            required
+            value={workspaceName}
+            onChange={(event) => setWorkspaceName(event.target.value)}
+            placeholder="For example, Design Team"
+            className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none focus:border-brand"
+          />
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setWorkspaceModalOpen(false)}
+              className="rounded-md border border-line px-3 py-2 text-sm text-quiet"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isCreatingWorkspace || workspaceName.trim().length < 2}
+              className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isCreatingWorkspace ? 'Creating…' : 'Create workspace'}
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
     {notice && <div role="status" className="fixed bottom-5 right-6 z-20 flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2.5 text-[11px] shadow-xl"><Check size={16} className="text-emerald-500" />{notice}<button className="ml-1 text-quiet" onClick={() => setNotice('')} aria-label="Dismiss"><X size={15} /></button></div>}
     <button onClick={toggleTheme} className="fixed bottom-4 right-4 z-10 hidden h-10 w-10 place-items-center rounded-full border border-line bg-panel text-quiet shadow-soft max-[680px]:grid" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
   </div>
