@@ -7,9 +7,11 @@ DevFlow is an early-stage collaboration platform for software teams to plan proj
 - Responsive React dashboard built with TypeScript and Tailwind CSS, including light and dark themes.
 - Supabase email sign-up, sign-in, session tracking, and sign-out.
 - Express API with a health endpoint and a protected endpoint for the current user.
-- Protected workspace creation endpoint backed by Prisma and PostgreSQL. Creating a workspace also records its creator as the owner.
+- Protected workspace endpoints for creating workspaces and listing the signed-in user's workspaces.
+- Workspace creation from the dashboard, with workspace selection remembered in the browser.
+- Prisma and PostgreSQL models for users, workspaces, workspace memberships, and workspace-scoped projects.
 
-The dashboard activity and project content are currently sample UI data. Workspace creation has a backend endpoint; the frontend workspace creation form is still to be connected.
+The dashboard activity and project list are currently sample UI data. The project database model is in place, but project creation and project-scoped task workflows are not implemented yet.
 
 ## Project layout
 
@@ -86,6 +88,7 @@ Open the local URL printed by Vite, usually `http://localhost:5173`.
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/health` | Check that the API is running. | Public |
 | `GET` | `/api/v1/auth/me` | Return the authenticated user's ID and email. | Supabase Bearer token required |
+| `GET` | `/api/v1/workspaces` | List workspaces the authenticated user belongs to, including their role. | Supabase Bearer token required |
 | `POST` | `/api/v1/workspaces` | Create a workspace and make the authenticated user its owner. | Supabase Bearer token required |
 
 The workspace endpoint expects a JSON body such as:
