@@ -9,9 +9,14 @@ DevFlow is an early-stage collaboration platform for software teams to plan proj
 - Express API with a health endpoint and a protected endpoint for the current user.
 - Protected workspace endpoints for creating workspaces and listing the signed-in user's workspaces.
 - Workspace creation from the dashboard, with workspace selection remembered in the browser.
-- Prisma and PostgreSQL models for users, workspaces, workspace memberships, and workspace-scoped projects.
+- Protected project endpoints for creating and listing projects in a workspace.
+- Project selection remembered in the browser, with real projects shown in the dashboard sidebar.
+- Protected task endpoints for creating and listing a project's tasks.
+- A task board with Todo, In progress, and Done columns, plus a Create Task form.
+- Prisma and PostgreSQL models for users, workspaces, workspace memberships, projects, and tasks.
+- Prisma 7 Client with a PostgreSQL driver adapter; Prisma 8 migration work is being introduced alongside it.
 
-The dashboard activity and project list are currently sample UI data. The project database model is in place, but project creation and project-scoped task workflows are not implemented yet.
+The main working flow is: sign in → create/select a workspace → create/select a project → create tasks → view tasks on the board. The activity feed and the remaining dashboard tabs are still sample UI.
 
 ## Project layout
 
@@ -63,12 +68,11 @@ From the project root:
 ```sh
 cd backend
 npm install
-npx prisma generate
-npx prisma migrate deploy
+npx prisma7 migrate deploy
 npm run dev
 ```
 
-The API runs on `http://localhost:4000` by default. Keep this terminal running.
+The backend's `dev` and `build` scripts generate Prisma Client 7 before running. Use `prisma7` for the current schema and migration workflow; `prisma` is the Prisma 8 CLI, which is installed for a staged migration and does not run the older `generate` or `migrate deploy` commands.
 
 ## Install and run the frontend
 
@@ -90,6 +94,10 @@ Open the local URL printed by Vite, usually `http://localhost:5173`.
 | `GET` | `/api/v1/auth/me` | Return the authenticated user's ID and email. | Supabase Bearer token required |
 | `GET` | `/api/v1/workspaces` | List workspaces the authenticated user belongs to, including their role. | Supabase Bearer token required |
 | `POST` | `/api/v1/workspaces` | Create a workspace and make the authenticated user its owner. | Supabase Bearer token required |
+| `GET` | `/api/v1/workspaces/:workspaceId/projects` | List projects in a workspace. | Supabase Bearer token required |
+| `POST` | `/api/v1/workspaces/:workspaceId/projects` | Create a project in a workspace. | Supabase Bearer token required |
+| `GET` | `/api/v1/projects/:projectId/tasks` | List tasks in a project. | Supabase Bearer token required |
+| `POST` | `/api/v1/projects/:projectId/tasks` | Create a task in a project. | Supabase Bearer token required |
 
 The workspace endpoint expects a JSON body such as:
 
@@ -98,6 +106,28 @@ The workspace endpoint expects a JSON body such as:
   "name": "Design Team"
 }
 ```
+
+The project endpoint expects:
+
+```json
+{
+  "name": "Marketing website",
+  "description": "Optional project context"
+}
+```
+
+The task endpoint expects:
+
+```json
+{
+  "title": "Design the task board",
+  "description": "Optional task context",
+  "status": "TODO",
+  "priority": "HIGH"
+}
+```
+
+Valid task statuses are `TODO`, `IN_PROGRESS`, and `DONE`. Valid priorities are `LOW`, `MEDIUM`, and `HIGH`.
 
 ## Production builds
 
