@@ -11,17 +11,25 @@ DevFlow is an early-stage collaboration platform for software teams to plan proj
 - Workspace creation from the dashboard, with workspace selection remembered in the browser.
 - Protected project endpoints for creating and listing projects in a workspace.
 - Project selection remembered in the browser, with real projects shown in the dashboard sidebar.
-- Protected task endpoints for creating and listing a project's tasks.
-- A task board with Todo, In progress, and Done columns, plus a Create Task form.
+- Protected task endpoints for creating, listing, and editing project tasks.
+- A task board with Todo, In Progress, and Done columns.
+- Task creation and editing for title, description, status, priority, and due date.
+- Task status changes persist through the backend and remain after refresh.
 - Prisma and PostgreSQL models for users, workspaces, workspace memberships, projects, and tasks.
 - Prisma 7 Client with a PostgreSQL driver adapter; Prisma 8 migration work is being introduced alongside it.
 
-The main working flow is: sign in → create/select a workspace → create/select a project → create tasks → view tasks on the board. The activity feed and the remaining dashboard tabs are still sample UI.
+The main working flow is:
+
+```text
+Sign in → Create/select workspace → Create/select project → Create task
+→ View board → Change status → Edit task details
+```
+The activity feed and the remaining dashboard tabs are still sample UI.
 
 ## Project layout
 
 - `frontend/` — React, TypeScript, Vite, Tailwind CSS, Supabase client, and UI features.
-- `backend/` — Express API, authentication middleware, workspace services, and Prisma database schema/migrations.
+- `backend/` — Express API, authentication middleware, workspace services, task services, and Prisma database schema/migrations.
 - `docs/` — architecture and product planning documents.
 - `DEVFLOW_PLAN.md` — product scope and delivery roadmap.
 
@@ -37,108 +45,102 @@ The main working flow is: sign in → create/select a workspace → create/selec
 2. In **Authentication → URL Configuration**, add `http://localhost:5173/**` to the redirect URLs.
 3. In **Project Settings → API Keys**, copy the Project URL and publishable key.
 4. Copy the Session Pooler connection string from the Supabase database settings.
-
-For local testing, Supabase email confirmation can be enabled or disabled in the Email provider settings. If confirmation is enabled, use an email inbox you can access. Before public use, configure an email sender and choose the confirmation behavior you want for your app.
+For local testing, Supabase email confirmation can be enabled or disabled in the Email provider settings. If confirmation is enabled, use an email inbox you can access.
 
 ## Environment variables
-
 Create `backend/.env`:
 
-```env
+```
 DATABASE_URL="paste-your-supabase-session-pooler-connection-string"
 SUPABASE_URL="https://your-project-ref.supabase.co"
 SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 PORT=4000
 ```
-
 Create `frontend/.env`:
 
-```env
+```
 VITE_SUPABASE_URL="https://your-project-ref.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 VITE_API_URL="http://localhost:4000"
 ```
-
-Use the Project URL and publishable key from the same Supabase project in both files. Never put a Supabase secret or `service_role` key in the frontend. Local `.env` files are ignored by Git. Restart the development server after changing environment variables.
+Use the Project URL and publishable key from the same Supabase project in both files. Never put a Supabase secret or `service_role` key in the frontend. Local `.env` files are ignored by Git.
 
 ## Install and prepare the backend
-
 From the project root:
 
-```sh
+```
 cd backend
 npm install
 npx prisma7 migrate deploy
 npm run dev
 ```
-
-The backend's `dev` and `build` scripts generate Prisma Client 7 before running. Use `prisma7` for the current schema and migration workflow; `prisma` is the Prisma 8 CLI, which is installed for a staged migration and does not run the older `generate` or `migrate deploy` commands.
+The backend `dev` and `build` scripts generate Prisma Client 7 before running. Use `prisma7` for the current schema and migration workflow.
 
 ## Install and run the frontend
-
 Open a second terminal from the project root:
 
-```sh
+```
 cd frontend
 npm install
 npm run dev
 ```
-
-Open the local URL printed by Vite, usually `http://localhost:5173`.
+Open the local Vite URL, usually `http://localhost:5173`.
 
 ## API endpoints
+MethodPathPurposeAuthentication`GET``/api/v1/health`Check that the API is running.Public`GET``/api/v1/auth/me`Return the authenticated user's ID and email.Supabase Bearer token required`GET``/api/v1/workspaces`List workspaces the authenticated user belongs to.Supabase Bearer token required`POST``/api/v1/workspaces`Create a workspace and make the user its owner.Supabase Bearer token required`GET``/api/v1/workspaces/:workspaceId/projects`List projects in a workspace.Supabase Bearer token required`POST``/api/v1/workspaces/:workspaceId/projects`Create a project in a workspace.Supabase Bearer token required`GET``/api/v1/projects/:projectId/tasks`List tasks in a project.Supabase Bearer token required`POST``/api/v1/projects/:projectId/tasks`Create a task in a project.Supabase Bearer token required`PATCH``/api/v1/tasks/:taskId`Update task details or status.Supabase Bearer token required
 
-| Method | Path | Purpose | Authentication |
-| --- | --- | --- | --- |
-| `GET` | `/api/v1/health` | Check that the API is running. | Public |
-| `GET` | `/api/v1/auth/me` | Return the authenticated user's ID and email. | Supabase Bearer token required |
-| `GET` | `/api/v1/workspaces` | List workspaces the authenticated user belongs to, including their role. | Supabase Bearer token required |
-| `POST` | `/api/v1/workspaces` | Create a workspace and make the authenticated user its owner. | Supabase Bearer token required |
-| `GET` | `/api/v1/workspaces/:workspaceId/projects` | List projects in a workspace. | Supabase Bearer token required |
-| `POST` | `/api/v1/workspaces/:workspaceId/projects` | Create a project in a workspace. | Supabase Bearer token required |
-| `GET` | `/api/v1/projects/:projectId/tasks` | List tasks in a project. | Supabase Bearer token required |
-| `POST` | `/api/v1/projects/:projectId/tasks` | Create a task in a project. | Supabase Bearer token required |
+## Example request bodies
+Create a workspace:
 
-The workspace endpoint expects a JSON body such as:
-
-```json
+```
 {
   "name": "Design Team"
 }
 ```
+Create a project:
 
-The project endpoint expects:
-
-```json
+```
 {
-  "name": "Marketing website",
-  "description": "Optional project context"
+  "name": "Marketing Website",
+  "description": "Website redesign work"
 }
 ```
+Create a task:
 
-The task endpoint expects:
-
-```json
+```
 {
   "title": "Design the task board",
-  "description": "Optional task context",
+  "description": "Create Todo, In Progress, and Done columns.",
   "status": "TODO",
   "priority": "HIGH"
 }
 ```
+Update a task:
 
-Valid task statuses are `TODO`, `IN_PROGRESS`, and `DONE`. Valid priorities are `LOW`, `MEDIUM`, and `HIGH`.
+```
+{
+  "title": "Design the updated task board",
+  "description": "Add responsive board cards.",
+  "status": "IN_PROGRESS",
+  "priority": "HIGH",
+  "dueDate": "2026-11-01T12:00:00.000Z"
+}
+```
+Valid task statuses are `TODO`, `IN_PROGRESS`, and `DONE`.
+
+Valid priorities are `LOW`, `MEDIUM`, and `HIGH`.
+
+Send `null` for `description` or `dueDate` to remove the current value.
 
 ## Production builds
-
 Run each build from its own folder:
 
-```sh
+```
 cd frontend
 npm run build
 ```
 
-```sh
+```
 cd backend
 npm run build
 ```

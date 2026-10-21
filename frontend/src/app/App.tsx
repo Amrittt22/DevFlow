@@ -10,6 +10,7 @@ import {
   type Workspace,
 } from '../services/api.service'
 import { apiRequest } from '../lib/api'
+import { UserCountOutputTypeCountMembershipsArgs } from '../../../backend/src/generated/prisma/models/User';
 
 const events = [
   { icon: CirclePlus, tone: 'violet', title: 'Maya Chen created a task', detail: 'Add keyboard shortcuts to the task board', time: '12 min ago', initials: 'MC', avatar: 'bg-orange-200 text-orange-900', project: 'Product' },
@@ -68,8 +69,8 @@ export default function App() {
     () => localStorage.getItem('devflow-active-workspace') ?? '',
   )
   const [activeProjectId, setActiveProjectId] = useState(
-  () => localStorage.getItem('devflow-active-project') ?? '',
-)
+    () => localStorage.getItem('devflow-active-project') ?? '',
+  )
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
@@ -78,6 +79,13 @@ export default function App() {
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('TODO')
   const [taskPriority, setTaskPriority] = useState<TaskPriority>('MEDIUM')
   const [isCreatingTask, setIsCreatingTask] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState('')
+  const [editTaskDescription, setEditTaskDescription] = useState('')
+  const [editTaskStatus, setEditTaskStatus] = useState<TaskStatus>('TODO')
+  const [editTaskPriority, setEditTaskPriority] = useState<TaskPriority>('MEDIUM')
+  const [editTaskDueDate, setEditTaskDueDate] = useState('')
+  const [isUpdatingTask, setIsUpdatingTask] = useState(false)
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0]
@@ -310,6 +318,86 @@ export default function App() {
     }
   }
 
+  async function handleUpdateTaskStatus(
+    taskId: string,
+    status: TaskStatus,
+  ) {
+    try {
+      const { task } = await apiRequest<{ task: Task }>(
+        `/api/v1/tasks/${taskId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        },
+      )
+
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === task.id ? task : currentTask,
+        ),
+      )
+
+      notify(`Task moved to ${status.replace('_', ' ').toLowerCase()}`)
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : 'Could not update task',
+      )
+    }
+  }
+
+  function openTaskEditor(task: Task) {
+    setEditingTask(task)
+    setEditTaskTitle(task.title)
+    setEditTaskDescription(task.description ?? '')
+    setEditTaskStatus(task.status)
+    setEditTaskPriority(task.priority)
+    setEditTaskDueDate(
+      task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '',
+    )
+  }
+
+  async function handleEditTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!editingTask) {
+      return
+    }
+
+    setIsUpdatingTask(true)
+
+    try {
+      const { task } = await apiRequest<{ task: Task }>(
+        `/api/v1/tasks/${editingTask.id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            title: editTaskTitle,
+            description: editTaskDescription || null,
+            status: editTaskStatus,
+            priority: editTaskPriority,
+            dueDate: editTaskDueDate
+              ? new Date(editTaskDueDate).toISOString()
+              : null,
+          }),
+        },
+      )
+
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === task.id ? task : currentTask,
+        ),
+      )
+
+      setEditingTask(null)
+      notify(`Task "${task.title}" updated`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not update task')
+    } finally {
+      setIsUpdatingTask(false)
+    }
+  }
+
+
   if (isLoading) {
     return <div className={`${dark ? 'dark' : ''} grid min-h-screen place-items-center bg-canvas text-ink`}>Checking your session…</div>
   }
@@ -375,11 +463,10 @@ export default function App() {
                       setActiveProjectId(project.id)
                       localStorage.setItem('devflow-active-project', project.id)
                     }}
-                    className={`flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center max-[680px]:px-0 ${
-                      activeProject?.id === project.id
+                    className={`flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center max-[680px]:px-0 ${activeProject?.id === project.id
                         ? 'bg-black/[.04] font-semibold dark:bg-white/[.05]'
                         : 'text-quiet'
-                    }`}
+                      }`}
                   >
                     <ProjectGlyph color={colors[index % colors.length]} />
                     <span className="flex-1 truncate max-[680px]:hidden">{project.name}</span>
@@ -407,7 +494,7 @@ export default function App() {
             <div className="mb-4 mt-7 flex items-center gap-3 text-[10px] font-semibold text-quiet"><span>Today</span><div className="h-px flex-1 bg-line" /></div>
             {shown.length ? <div>{shown.map((event, index) => { const Icon = event.icon; return <article key={event.title} className="relative flex gap-3 pb-5"><div className={`z-[1] grid h-[25px] w-[25px] shrink-0 place-items-center rounded-lg border border-line bg-panel ${tone[event.tone as keyof typeof tone]}`}><Icon size={15} /></div>{index < shown.length - 1 && <div className="absolute bottom-[-1px] left-3 top-7 w-px bg-line" />}<div className="min-w-0 flex-1"><div className="mb-2 flex min-h-[25px] items-center gap-2"><Avatar initials={event.initials} color={event.avatar} small /><p className="m-0 flex items-center gap-2 text-[10px] max-[680px]:block"><strong className="font-semibold">{event.title}</strong><span className="text-[9px] text-quiet max-[680px]:block">{event.time}</span></p></div><div className="flex min-h-[60px] items-center justify-between rounded-lg border border-line bg-panel px-3 shadow-soft transition hover:-translate-y-px hover:border-violet-300"><div className="flex min-w-0 items-center gap-2.5"><ProjectGlyph color={event.tone} /><div className="flex min-w-0 flex-col gap-1"><strong className="truncate text-[11px] font-semibold">{event.detail}</strong><span className="text-[9px] text-quiet">{event.project} <i className="not-italic">·</i> Updated just now</span></div></div><button onClick={() => notify(`Opened: ${event.detail}`)} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05]" aria-label={`Open ${event.detail}`}><ChevronRight size={16} /></button></div></div></article> })}</div> : <div className="flex min-h-[190px] flex-col items-center justify-center gap-2 text-quiet"><Search size={21} /><strong className="text-xs text-ink">No matching activity</strong><span className="text-[10px]">Try a different search.</span></div>}
             <button onClick={() => notify('You’re viewing the latest activity')} className="ml-[38px] mt-1 flex items-center gap-1.5 text-[10px] text-quiet"><span>You’re all caught up</span><Check size={14} className="text-emerald-500" /></button>
-          </section> : activeTab === 'Board' ? <TaskBoard tasks={tasks} isLoading={isLoadingTasks} hasProject={Boolean(activeProject)} onCreateTask={() => { setTaskTitle(''); setTaskDescription(''); setTaskStatus('TODO'); setTaskPriority('MEDIUM'); setTaskModalOpen(true) }} /> : <section className="flex h-[430px] flex-col items-center justify-center text-center"><div className="grid h-12 w-12 place-items-center rounded-xl bg-brand-soft text-brand dark:bg-violet-950"><FolderKanban size={22} /></div><h2 className="mt-4 font-display text-[17px] font-bold">{activeTab} is ready for your team</h2><p className="mb-4 mt-1 text-[11px] text-quiet">Project {activeTab.toLowerCase()} will show up here as you build out DevFlow.</p><button onClick={() => setActiveTab('Activity')} className="rounded-md bg-brand px-3 py-2 text-[11px] font-semibold text-white">Back to activity</button></section>}
+          </section> : activeTab === 'Board' ? <TaskBoard tasks={tasks} isLoading={isLoadingTasks} hasProject={Boolean(activeProject)} onCreateTask={() => { setTaskTitle(''); setTaskDescription(''); setTaskStatus('TODO'); setTaskPriority('MEDIUM'); setTaskModalOpen(true) }} onUpdateStatus={handleUpdateTaskStatus} onEditTask={openTaskEditor}/> : <section className="flex h-[430px] flex-col items-center justify-center text-center"><div className="grid h-12 w-12 place-items-center rounded-xl bg-brand-soft text-brand dark:bg-violet-950"><FolderKanban size={22} /></div><h2 className="mt-4 font-display text-[17px] font-bold">{activeTab} is ready for your team</h2><p className="mb-4 mt-1 text-[11px] text-quiet">Project {activeTab.toLowerCase()} will show up here as you build out DevFlow.</p><button onClick={() => setActiveTab('Activity')} className="rounded-md bg-brand px-3 py-2 text-[11px] font-semibold text-white">Back to activity</button></section>}
           <footer className="mt-[72px] flex justify-between border-t border-line py-4 text-[9px] text-quiet"><span>Made for teams that build</span><span className="flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-full bg-emerald-400" />All systems operational</span></footer>
         </div>
       </main>
@@ -606,6 +693,118 @@ export default function App() {
         </form>
       </div>
     )}
+    {editingTask && (
+      <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4">
+        <form
+          onSubmit={(event) => void handleEditTask(event)}
+          className="w-full max-w-md rounded-xl border border-line bg-panel p-5 shadow-xl"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="font-display text-lg font-bold">Edit task</h2>
+              <p className="mt-1 text-sm text-quiet">
+                Update the task details and progress.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setEditingTask(null)}
+              className="text-quiet hover:text-ink"
+              aria-label="Close dialog"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <label htmlFor="edit-task-title" className="mt-5 block text-sm font-medium">
+            Task title
+          </label>
+          <input
+            id="edit-task-title"
+            autoFocus
+            minLength={2}
+            maxLength={160}
+            required
+            value={editTaskTitle}
+            onChange={(event) => setEditTaskTitle(event.target.value)}
+            className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none focus:border-brand"
+          />
+
+          <label htmlFor="edit-task-description" className="mt-4 block text-sm font-medium">
+            Description
+          </label>
+          <textarea
+            id="edit-task-description"
+            maxLength={2000}
+            value={editTaskDescription}
+            onChange={(event) => setEditTaskDescription(event.target.value)}
+            className="mt-2 min-h-20 w-full resize-y rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-brand"
+          />
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <label className="text-sm font-medium">
+              Status
+              <select
+                value={editTaskStatus}
+                onChange={(event) =>
+                  setEditTaskStatus(event.target.value as TaskStatus)
+                }
+                className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-2 text-sm text-ink outline-none focus:border-brand"
+              >
+                <option value="TODO">Todo</option>
+                <option value="IN_PROGRESS">In progress</option>
+                <option value="DONE">Done</option>
+              </select>
+            </label>
+
+            <label className="text-sm font-medium">
+              Priority
+              <select
+                value={editTaskPriority}
+                onChange={(event) =>
+                  setEditTaskPriority(event.target.value as TaskPriority)
+                }
+                className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-2 text-sm text-ink outline-none focus:border-brand"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </label>
+          </div>
+
+          <label htmlFor="edit-task-due-date" className="mt-4 block text-sm font-medium">
+            Due date <span className="text-quiet">(optional)</span>
+          </label>
+          <input
+            id="edit-task-due-date"
+            type="datetime-local"
+            value={editTaskDueDate}
+            onChange={(event) => setEditTaskDueDate(event.target.value)}
+            className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none focus:border-brand"
+          />
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingTask(null)}
+              className="rounded-md border border-line px-3 py-2 text-sm text-quiet"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isUpdatingTask || editTaskTitle.trim().length < 2}
+              className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isUpdatingTask ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
     {notice && <div role="status" className="fixed bottom-5 right-6 z-20 flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2.5 text-[11px] shadow-xl"><Check size={16} className="text-emerald-500" />{notice}<button className="ml-1 text-quiet" onClick={() => setNotice('')} aria-label="Dismiss"><X size={15} /></button></div>}
     <button onClick={toggleTheme} className="fixed bottom-4 right-4 z-10 hidden h-10 w-10 place-items-center rounded-full border border-line bg-panel text-quiet shadow-soft max-[680px]:grid" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
   </div>
@@ -616,11 +815,15 @@ function TaskBoard({
   isLoading,
   hasProject,
   onCreateTask,
+  onUpdateStatus,
+  onEditTask,
 }: {
   tasks: Task[]
   isLoading: boolean
   hasProject: boolean
   onCreateTask: () => void
+  onUpdateStatus: (taskId: string, status: TaskStatus) => void
+  onEditTask: (task: Task) => void
 }) {
   const columns: Array<{ status: TaskStatus; label: string; dot: string }> = [
     { status: 'TODO', label: 'Todo', dot: 'bg-slate-400' },
@@ -671,11 +874,37 @@ function TaskBoard({
                 <div className="space-y-2">
                   {columnTasks.map((task) => (
                     <article key={task.id} className="rounded-lg border border-line bg-panel p-3 shadow-soft">
-                      <h4 className="text-xs font-semibold">{task.title}</h4>
-                      {task.description && <p className="mt-1.5 line-clamp-2 text-[11px] text-quiet">{task.description}</p>}
-                      <span className={`mt-3 inline-flex rounded px-1.5 py-0.5 text-[9px] font-semibold ${priorityStyles[task.priority]}`}>
-                        {task.priority.toLowerCase()} priority
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onEditTask(task)}
+                        className="w-full text-left"
+                      >
+                        <h4 className="text-xs font-semibold">{task.title}</h4>
+
+                        {task.description && (
+                          <p className="mt-1.5 line-clamp-2 text-[11px] text-quiet">
+                            {task.description}
+                          </p>
+                        )}
+
+                        <span
+                          className={`mt-3 inline-flex rounded px-1.5 py-0.5 text-[9px] font-semibold ${priorityStyles[task.priority]}`}
+                        >
+                          {task.priority.toLowerCase()} priority
+                        </span>
+                      </button>
+                      <select
+                        value={task.status}
+                        onChange={(event) =>
+                          onUpdateStatus(task.id, event.target.value as TaskStatus)
+                        }
+                        className="mt-3 h-7 w-full rounded border border-line bg-canvas px-1.5 text-[10px] text-ink outline-none focus:border-brand"
+                        aria-label={`Change status for ${task.title}`}
+                      >
+                        <option value="TODO">Todo</option>
+                        <option value="IN_PROGRESS">In progress</option>
+                        <option value="DONE">Done</option>
+                      </select>
                     </article>
                   ))}
                   {!columnTasks.length && <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[10px] text-quiet">No tasks</p>}

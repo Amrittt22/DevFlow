@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma.js'
-import type { CreateTaskInput } from './task.schemas.js'
+import type { CreateTaskInput,UpdateTaskInput } from './task.schemas.js'
 
 const taskFields = {
   id: true,
@@ -72,6 +72,37 @@ export async function createTaskForProject(
         priority: input.priority,
         dueDate: input.dueDate,
       },
+      select: taskFields,
+    })
+  })
+}
+export async function updateTask(
+  taskId: string,
+  userId: string,
+  input: UpdateTaskInput,
+) {
+  return prisma.$transaction(async (transaction) => {
+    const task = await transaction.task.findFirst({
+      where: {
+        id: taskId,
+        project: {
+          workspace: {
+            members: {
+              some: { userId },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    })
+
+    if (!task) {
+      return null
+    }
+
+    return transaction.task.update({
+      where: { id: taskId },
+      data: input,
       select: taskFields,
     })
   })
