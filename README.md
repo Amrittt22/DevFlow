@@ -87,7 +87,18 @@ npm run dev
 Open the local Vite URL, usually `http://localhost:5173`.
 
 ## API endpoints
-MethodPathPurposeAuthentication`GET``/api/v1/health`Check that the API is running.Public`GET``/api/v1/auth/me`Return the authenticated user's ID and email.Supabase Bearer token required`GET``/api/v1/workspaces`List workspaces the authenticated user belongs to.Supabase Bearer token required`POST``/api/v1/workspaces`Create a workspace and make the user its owner.Supabase Bearer token required`GET``/api/v1/workspaces/:workspaceId/projects`List projects in a workspace.Supabase Bearer token required`POST``/api/v1/workspaces/:workspaceId/projects`Create a project in a workspace.Supabase Bearer token required`GET``/api/v1/projects/:projectId/tasks`List tasks in a project.Supabase Bearer token required`POST``/api/v1/projects/:projectId/tasks`Create a task in a project.Supabase Bearer token required`PATCH``/api/v1/tasks/:taskId`Update task details or status.Supabase Bearer token required
+
+| Method | Path | Purpose | Authentication |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/health` | Check that the API is running. | Public |
+| `GET` | `/api/v1/auth/me` | Return the authenticated user's ID and email. | Supabase Bearer token required |
+| `GET` | `/api/v1/workspaces` | List workspaces the authenticated user belongs to. | Supabase Bearer token required |
+| `POST` | `/api/v1/workspaces` | Create a workspace and make the user its owner. | Supabase Bearer token required |
+| `GET` | `/api/v1/workspaces/:workspaceId/projects` | List projects in a workspace. | Supabase Bearer token required |
+| `POST` | `/api/v1/workspaces/:workspaceId/projects` | Create a project in a workspace. | Supabase Bearer token required |
+| `GET` | `/api/v1/projects/:projectId/tasks` | List tasks in a project. | Supabase Bearer token required |
+| `POST` | `/api/v1/projects/:projectId/tasks` | Create a task in a project. | Supabase Bearer token required |
+| `PATCH` | `/api/v1/tasks/:taskId` | Update task details or status. | Supabase Bearer token required |
 
 ## Example request bodies
 Create a workspace:
