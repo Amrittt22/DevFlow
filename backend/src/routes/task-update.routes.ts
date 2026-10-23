@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.middleware.js'
-import { updateTask } from '../modules/tasks/task.service.js'
+import { deleteTask,updateTask } from '../modules/tasks/task.service.js'
 import { updateTaskSchema } from '../modules/tasks/task.schemas.js'
 
 const taskUpdateRouter = Router()
@@ -39,6 +39,28 @@ taskUpdateRouter.patch('/:taskId', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('Task update failed:', error)
     response.status(500).json({ error: 'Unable to update task' })
+  }
+})
+taskUpdateRouter.delete('/:taskId', requireAuth, async (request, response) => {
+  const taskId = request.params.taskId
+
+  if (typeof taskId !== 'string') {
+    response.status(400).json({ error: 'A valid task ID is required' })
+    return
+  }
+
+  try {
+    const deleted = await deleteTask(taskId, response.locals.authUser.id)
+
+    if (!deleted) {
+      response.status(403).json({ error: 'You cannot access this task' })
+      return
+    }
+
+    response.status(200).json({ success: true })
+  } catch (error) {
+    console.error('Task deletion failed:', error)
+    response.status(500).json({ error: 'Unable to delete task' })
   }
 })
 

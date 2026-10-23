@@ -1,260 +1,176 @@
-# DevFlow — Project Plan Sheet
-
-**Project:** DevFlow  
-**Positioning:** A full-stack collaboration platform for software teams to plan work, track issues and sprints, and connect delivery activity to GitHub.  
-**Audience:** Hiring teams evaluating full-stack engineering, product thinking, API design, data modeling, and delivery skills.
+# DevFlow — Implementation Plan
 
 ## Product goal
 
-Help a small engineering team understand what is planned, what is in progress, who owns it, and how work is moving from task to pull request to completion.
+DevFlow is a full-stack collaboration platform where software teams can plan projects, organize tasks, track issues, coordinate sprints, and see how work progresses.
 
-## Product principles
+## Current progress
 
-- Ship a cohesive, usable core before adding infrastructure for its own sake.
-- Enforce workspace and project permissions on the server for every protected operation.
-- Make work visible through clear status, ownership, history, and activity.
-- Keep integrations and advanced services optional until the core workflow is reliable.
+The foundation is complete and the project is approximately **45% complete** against this expanded plan.
 
-## Target users and roles
+### Completed
 
-- **Workspace admin:** manages workspace settings, members, and access.
-- **Project manager:** creates projects, plans sprints, and organizes work.
-- **Developer:** updates assigned work, collaborates, and links code activity.
+- Supabase email authentication and protected frontend routes.
+- Express API with server-side Supabase token verification.
+- PostgreSQL database with Prisma migrations.
+- Workspace creation and workspace membership checks.
+- Project creation, loading, selection, and browser persistence.
+- Task creation, loading, editing, deletion, priorities, and due dates.
+- Todo, In Progress, and Done task board.
+- Drag-and-drop task status changes that persist in the database.
+- Task List view.
+- Calendar view with due-date navigation and task editing.
+- Task search and filters for status, priority, and due dates.
+- Responsive Tailwind interface with light and dark modes.
 
-## Proposed stack
+## Core user journey
+
+```text
+Sign in
+→ Create or select a workspace
+→ Create or select a project
+→ Create, edit, assign, and organize tasks
+→ Collaborate through comments and activity
+→ Plan work in sprints and track progress
+```
+
+## Technology stack
 
 | Area | Choice |
-|---|---|
-| Web app | React + TypeScript |
-| Styling | Tailwind CSS |
-| API | Node.js + Express + TypeScript, REST under `/api/v1` |
-| Data store | PostgreSQL |
-| Data access | Prisma |
-| Authentication | Supabase Auth, with server-verified identity |
-| File storage | Supabase Storage, added when attachments are in scope |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
+| Backend | Node.js, Express, TypeScript, REST API |
+| Authentication | Supabase Auth |
+| Database | Supabase PostgreSQL |
+| ORM | Prisma 7 Client with PostgreSQL driver adapter |
 | Validation | Zod |
-| Cache / rate limiting | Redis, introduced when a measured use case exists |
-| Tests | Vitest or Jest, Supertest, and browser-level flow tests |
-| Local environment | Start with the simplest reproducible local setup; add Docker Compose after learning Docker |
-| Deployment | Vercel for web; a suitable container host for API and workers |
-| CI | GitHub Actions |
+| Caching and background jobs | Redis |
+| Future local environment | Docker and Docker Compose |
+| Future continuous integration | GitHub Actions |
 
-## MVP scope
+## Phase 1 — Complete task management
 
-The first complete release should support:
+### Goals
 
-1. Sign in and a user profile.
-2. Workspaces with membership and roles.
-3. Projects scoped to a workspace.
-4. Tasks with description, assignee, status, priority, labels, due date, comments, and activity history.
-5. A Kanban board, list view, and useful filters.
-6. Issues with reporter, assignee, status, labels, comments, related tasks, and activity history.
-7. Basic sprint planning and progress tracking.
-8. A workspace/project activity feed for important events such as assignments, status changes, issue creation, and comments.
-9. Responsive layouts, empty/loading/error states, and a demo path.
+- Add a Calendar view for tasks with due dates.
+- Add search, filters, and sorting by status, priority, due date, label, and assignee.
+- Add reusable task labels such as `bug`, `frontend`, `design`, and `urgent`.
+- Add task assignment to workspace members.
+- Improve empty, loading, error, and confirmation states.
 
-Keep GitHub integration, Redis, real-time collaboration, and AI out of the critical MVP path. Add them as separate, demonstrable milestones after the core workflow works end to end.
+### Exit check
 
-## Data model starting point
+A team can create, find, assign, prioritize, schedule, edit, delete, and complete work in a project.
 
-```text
-User ──< WorkspaceMember >── Workspace ──< Project
-User ──< ProjectMember >── Project
-Project ──< Task >── User (assignee)
-Project ──< Issue >── User (reporter / assignee)
-Project ──< Sprint ──< SprintTask >── Task
-Task ──< Comment
-Issue ──< Comment
-Task / Issue ──< AttachmentMetadata
-Task / Issue ──< ActivityEvent
-User ──< Notification
-Workspace ──< GitHubAccount / GitHubRepository / PullRequest / WebhookEvent
-```
+## Phase 2 — Workspace collaboration
 
-Core entities include `User`, `Workspace`, `WorkspaceMember`, `Project`, `ProjectMember`, `Task`, `TaskLabel`, `Issue`, `Comment`, `Attachment`, `Sprint`, `Notification`, `Activity`, `GitHubAccount`, `GitHubRepository`, `PullRequest`, and `WebhookEvent`. Every workspace-owned record should be traceable to its workspace or project. Store attachment metadata and ownership in PostgreSQL and file bytes in object storage. Add database constraints and indexes for common access paths, including workspace/project membership, project task status, assignee, and sprint membership. Use migrations as the source of truth for schema changes.
+### Goals
 
-## Roadmap and deliverables
+- Show workspace members in the interface.
+- Invite members by email.
+- Manage Owner, Admin, and Member roles.
+- Add project membership where it improves access control.
+- Add task comments.
+- Record activity for task creation, edits, status changes, assignments, comments, and deletion.
+- Add in-app notifications for assignments, comments, and approaching due dates.
 
-### Phase 1 — Product definition and foundation
+### Exit check
 
-- Confirm the core user journey and MVP boundaries.
-- Sketch dashboard, project, board, issue, sprint, and settings screens.
-- Create repository, README outline, environment variable example, and ignore rules.
-- Set up client and server TypeScript applications, formatting, linting, and local scripts.
-- Define API conventions, error response shape, and initial Prisma schema.
+Multiple users can collaborate in the same workspace with clear ownership, role checks, and a visible history of changes.
 
-**Exit check:** a fresh clone can start locally, and the architecture and MVP are documented.
+## Phase 3 — Planning views and sprints
 
-### Phase 2 — Identity, workspace, and authorization
+### Goals
 
-- Implement sign-in, sign-out, profile retrieval, and protected routes.
-- Verify Supabase identity on the server; never trust a client-supplied user ID or role.
-- Add workspace creation, invitations or member addition, and role assignment.
-- Add project membership and project-scoped permissions in addition to workspace membership.
-- Centralize authorization checks and test access boundaries between workspaces.
+- Finish the Calendar view.
+- Build a Timeline view.
+- Create sprints with start and end dates.
+- Add tasks to sprints.
+- Show sprint progress: Todo, In Progress, Done, and remaining work.
+- Build a project overview with open, completed, overdue, and recent work.
 
-**Exit check:** users can only read or change data in workspaces they belong to, at the role allowed.
+### Exit check
 
-### Phase 3 — Projects and task workflow
+A team can plan a sprint and understand project progress from the dashboard.
 
-- Create, update, archive, and list projects.
-- Implement task creation, editing, assignment, status, priority, labels, and due dates.
-- Add board and list views with filtering, sorting, and pagination.
-- Record task activity for meaningful changes.
+## Phase 4 — Issue tracking
 
-**Exit check:** a team can create a project and move tasks through `TODO → IN_PROGRESS → REVIEW → DONE`.
+### Goals
 
-Task drag-and-drop must persist the status/order change through the API. Add real-time propagation in Phase 8.
+- Add issues separately from regular tasks.
+- Support issue title, description, status, priority, labels, reporter, and assignee.
+- Add issue comments and activity history.
+- Link related issues and tasks.
 
-### Phase 4 — Issues and collaboration
+### Exit check
 
-- Add issue reporting, assignment, labels, priority, status, and comments.
-- Show activity history and link issues to tasks where useful.
-- Add optional file attachments with storage access policies and file-size/type limits.
-- Store attachment metadata and ownership in PostgreSQL while storing file bytes in Supabase Storage; validate type, size, and authorization.
-- Add notifications for assignments, mentions, comments, and deadlines as the notification flow is introduced.
+A user can report, discuss, assign, and resolve an issue with a complete audit trail.
 
-**Exit check:** users can report, discuss, assign, and resolve an issue with an auditable history.
+## Phase 5 — Reliability and product quality
 
-### Phase 5 — Sprints and dashboards
+### Goals
 
-- Create sprints with start/end dates and planned tasks.
-- Show sprint progress using clear completed, in-progress, and remaining counts.
-- Add a project dashboard for open work, overdue items, and recent activity.
-- Add project overview, members, tasks, issues, sprints, and activity as dashboard sections; show PRs and commits after GitHub integration.
-- Defer velocity and burndown charts until there is enough consistent history to make them meaningful.
-- Present analytics as project delivery signals; do not turn them into simplistic individual productivity scores.
+- Standardize API error responses.
+- Add validation and authorization checks for every protected route.
+- Add task pagination, filtering, and sorting on the server where needed.
+- Improve keyboard navigation, labels, focus states, and mobile layouts.
+- Add frontend empty, loading, retry, and error states.
+- Add unit tests for validation and service rules.
+- Add API integration tests for authentication and workspace permissions.
+- Add browser flow tests for the main user journey.
 
-**Exit check:** a team can plan a sprint and understand its current state from the dashboard.
+### Exit check
 
-### Phase 6 — Reliability and API hardening
+The main user journey is reliable, accessible, tested, and easy to demonstrate.
 
-- Add request validation, centralized error handling, pagination, filtering, and sorting.
-- Configure CORS, secure headers, rate limits, structured logs, and health endpoints.
-- Add transactions for multi-record changes and indexes based on query patterns.
-- Define behavior for database, storage, and external service failures.
+## Phase 6 — Docker, GitHub Actions, and deployment
 
-**Exit check:** errors are predictable, sensitive values stay out of logs, and common queries are bounded.
+### Docker goals
 
-### Phase 7 — GitHub integration
+- Learn containers, images, ports, volumes, and environment variables.
+- Create a Dockerfile for the frontend.
+- Create a Dockerfile for the backend.
+- Add Docker Compose for reproducible local development with frontend, backend, and Redis services.
 
-- Connect a GitHub account using least-privilege authorization.
-- Let users associate a repository with a project.
-- Display pull requests and repository activity; link PRs to DevFlow issues/tasks.
-- Include repository, commit, and branch views where supported by the GitHub API and granted scopes.
-- Verify webhook signatures, handle retries and duplicate delivery safely (idempotency), and retain integration status.
-- Update linked work when a PR is merged, with clear rules and an activity record.
+### Redis goals
 
-**Exit check:** a demo shows a linked issue moving through a real repository workflow.
+- Learn Redis keys, expiry times, and in-memory data storage.
+- Add API rate limiting for sensitive and frequently used endpoints.
+- Add a background-job queue for assignment, comment, and due-date notifications.
+- Keep notification work out of the main API request so users receive faster responses.
+- Add dashboard caching only after measuring a slow or frequently repeated query.
 
-### Phase 8 — Real-time updates and notifications
+### GitHub Actions goals
 
-- Add Socket.IO or another WebSocket layer for task, comment, and notification updates.
-- Authorize each connection and room against workspace membership.
-- Persist important notifications; treat online presence as temporary state.
-- Add selected presence or typing indicators only if they improve collaboration, and design event delivery so it can later work across multiple API instances.
-- Keep ordinary page refresh and API behavior usable if sockets disconnect.
+- Learn continuous integration workflows.
+- Run frontend and backend builds automatically for every push and pull request.
+- Run tests automatically after they are added.
+- Learn how to read and fix failed workflow logs.
 
-**Exit check:** a second user sees key changes without refreshing, with permission checks preserved.
+### Deployment goals
 
-### Phase 9 — Redis, only for clear needs
+- Deploy the frontend and backend.
+- Configure production environment variables and database migrations.
+- Add health checks and basic monitoring.
+- Publish setup instructions, screenshots, and a project walkthrough.
 
-- Begin with rate limiting or caching a measured, frequently requested read.
-- Set TTLs and invalidation behavior; avoid caching authorization decisions carelessly.
-- Learn and document cache-aside behavior, cache misses, TTLs, and invalidation for the chosen cached path.
-- Consider queues for webhook or notification processing if response work becomes slow.
-- Make the application degrade safely if Redis is unavailable.
+### Exit check
 
-**Exit check:** document the before/after behavior and why Redis improves a real path.
+A reviewer can clone, build, test, and run DevFlow consistently, then access a deployed demo.
 
-### Phase 10 — Testing, deployment, and portfolio finish
+## Later milestones
 
-- Unit-test domain rules and validation.
-- Integration-test authentication, authorization, API behavior, and database interactions.
-- Cover key user journeys in browser tests: create workspace, create project, move task, plan sprint.
-- Add CI checks for formatting, linting, type checking, and the test suite.
-- After learning Docker, containerize the API and supporting services; provide Docker Compose for reproducible local development, health checks, and environment-specific configuration.
-- Deploy HTTPS app and API, configure secrets, migrations, health checks, backups, and basic monitoring.
-- Publish screenshots, architecture diagram, setup instructions, demo credentials or demo mode, and a short walkthrough.
+These are not part of the core plan until the application is stable.
 
-**Exit check:** a reviewer can open the live app, understand its purpose, and reproduce the development setup.
+- GitHub repository and pull request integration.
+- Real-time task updates and notifications.
+- AI task suggestions, issue breakdowns, pull request summaries, and release-note drafts.
 
-### Later — AI features
+## Working rules
 
-Only add these after the core product and GitHub integration are reliable. Keep AI behind a service boundary with usage limits, logging, cost controls, and output evaluation:
-
-- Break an issue into suggested implementation tasks.
-- Summarize a pull request using repository context.
-- Draft release notes from merged pull requests.
-- Answer repository questions with citations to relevant files.
-
-Require user review before AI-generated content changes project data. Show sources and handle unavailable or unauthorized repository context clearly.
-
-## API outline
-
-```text
-/api/v1/users/me
-/api/v1/workspaces
-/api/v1/workspaces/:workspaceId/members
-/api/v1/projects
-/api/v1/projects/:projectId/tasks
-/api/v1/projects/:projectId/issues
-/api/v1/projects/:projectId/sprints
-/api/v1/github/connections
-/api/v1/github/webhooks
-```
-
-Use consistent status codes, validation errors, cursor or page pagination, and server-side authorization for every workspace-scoped endpoint.
-
-## Suggested repository layout
-
-```text
-devflow/
-├── client/
-│   └── src/{components,features,hooks,services,types,utils}/
-├── server/
-│   ├── src/{routes,controllers,services,repositories,middleware,validators,config}/
-│   └── prisma/{schema.prisma,migrations}/
-├── docs/
-│   ├── architecture.md
-│   └── product-plan.md
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
-
-Keep the request flow understandable: route → middleware → controller → service → repository/Prisma → PostgreSQL. Keep controllers thin and business rules in services/domain modules rather than embedding them in route handlers or UI components. Use consistent API response shapes.
-
-## Quality and security checklist
-
-- Validate all external input and escape/render user content safely.
-- Check workspace membership and role on the server for every protected operation.
-- Store secrets only in environment configuration; commit `.env.example`, never real credentials.
-- Use least-privilege OAuth scopes and verify GitHub webhook signatures.
-- Enforce upload limits and storage policies if attachments are enabled.
-- Add rate limits, secure headers, HTTPS, and structured logs without tokens or private payloads.
-- Use migrations, backups, and health checks for production data.
-- Provide accessible labels, keyboard navigation, responsive behavior, and clear failure states.
-
-## Success measures
-
-Measure these after implementation and report only observed results:
-
-- Number of complete user flows demonstrated.
-- API response time for representative dashboard requests.
-- Test coverage of critical domain rules and authorization paths.
-- Successful webhook processing and duplicate-delivery handling.
-- Usability feedback from a few developers trying the demo.
-
-Avoid claiming scale (for example, “100 users” or “1,000 requests”) unless a repeatable load test was run and its setup and results are documented.
-
-## Resume target
-
-> Built and deployed **DevFlow**, a full-stack collaboration platform for engineering teams, using React, TypeScript, Express, PostgreSQL, and Prisma. Implemented workspace-level role-based access, task and issue workflows, sprint planning, and GitHub pull request integration; added automated API tests and CI. *(Replace or extend this with only shipped features and measured results.)*
-
-## Definition of done
-
-- **MVP:** authentication, workspace roles, projects, tasks, issues, and sprint basics work end to end.
-- **Portfolio release:** deployed app, clean onboarding, screenshots, architecture notes, CI, and meaningful automated coverage.
-- **Advanced release:** GitHub integration, real-time updates, and Redis each have a working demo and documented design reason.
-- **AI extension:** useful, source-grounded assistance with user review and clear failure behavior.
+- Every workspace-scoped operation must verify membership on the backend.
+- Never expose Supabase secrets or database credentials in the frontend or Git history.
+- Use Prisma migrations as the source of truth for database changes.
+- Add database indexes for frequently queried relationships and filters.
+- Build and verify frontend and backend after each completed feature.
+- Update the README whenever user-facing functionality or setup steps change.

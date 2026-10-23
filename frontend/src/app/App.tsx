@@ -10,7 +10,6 @@ import {
   type Workspace,
 } from '../services/api.service'
 import { apiRequest } from '../lib/api'
-import { UserCountOutputTypeCountMembershipsArgs } from '../../../backend/src/generated/prisma/models/User';
 
 const events = [
   { icon: CirclePlus, tone: 'violet', title: 'Maya Chen created a task', detail: 'Add keyboard shortcuts to the task board', time: '12 min ago', initials: 'MC', avatar: 'bg-orange-200 text-orange-900', project: 'Product' },
@@ -31,6 +30,7 @@ type Project = {
 
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
+type DueDateFilter = 'ALL' | 'WITH_DUE_DATE' | 'WITHOUT_DUE_DATE'
 
 type Task = {
   id: string
@@ -46,11 +46,21 @@ type Task = {
 const tabs = [{ label: 'Overview', icon: LayoutGrid }, { label: 'List', icon: List }, { label: 'Board', icon: FolderKanban }, { label: 'Calendar', icon: CalendarDays }, { label: 'Timeline', icon: SlidersHorizontal }, { label: 'Files', icon: FileText }, { label: 'Activity', icon: Activity }]
 const tone = { violet: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-300', green: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300', blue: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300', orange: 'bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-300', pink: 'bg-pink-50 text-pink-600 dark:bg-pink-950 dark:text-pink-300' }
 
+function getActiveProjectStorageKey(workspaceId: string) {
+  return `devflow-active-project:${workspaceId}`
+}
+
 export default function App() {
   const { user, isLoading } = useAuth()
   const [dark, setDark] = useState(() => localStorage.getItem('devflow-theme') === 'dark')
   const [activeNav, setActiveNav] = useState('Activity')
-  const [activeTab, setActiveTab] = useState('Activity')
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('devflow-active-tab')
+
+    return tabs.some((tab) => tab.label === savedTab)
+      ? savedTab!
+      : 'Activity'
+  })
   const [filter, setFilter] = useState(false)
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
@@ -60,6 +70,7 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true)
   const [projects, setProjects] = useState<Project[]>([])
+  const [loadedProjectsWorkspaceId, setLoadedProjectsWorkspaceId] = useState('')
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [projectModalOpen, setProjectModalOpen] = useState(false)
   const [projectName, setProjectName] = useState('')
@@ -68,9 +79,17 @@ export default function App() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(
     () => localStorage.getItem('devflow-active-workspace') ?? '',
   )
-  const [activeProjectId, setActiveProjectId] = useState(
-    () => localStorage.getItem('devflow-active-project') ?? '',
-  )
+  const [activeProjectId, setActiveProjectId] = useState(() => {
+    const savedWorkspaceId = localStorage.getItem('devflow-active-workspace')
+
+    if (!savedWorkspaceId) {
+      return ''
+    }
+
+    return (
+      localStorage.getItem(getActiveProjectStorageKey(savedWorkspaceId)) ?? ''
+    )
+  })
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
@@ -78,6 +97,14 @@ export default function App() {
   const [taskDescription, setTaskDescription] = useState('')
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('TODO')
   const [taskPriority, setTaskPriority] = useState<TaskPriority>('MEDIUM')
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskStatusFilter, setTaskStatusFilter] = useState<
+    TaskStatus | 'ALL'
+  >('ALL')
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState<
+    TaskPriority | 'ALL'
+  >('ALL')
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('ALL')
   const [isCreatingTask, setIsCreatingTask] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editTaskTitle, setEditTaskTitle] = useState('')
@@ -86,11 +113,30 @@ export default function App() {
   const [editTaskPriority, setEditTaskPriority] = useState<TaskPriority>('MEDIUM')
   const [editTaskDueDate, setEditTaskDueDate] = useState('')
   const [isUpdatingTask, setIsUpdatingTask] = useState(false)
-  const activeWorkspace =
-    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
-    workspaces[0]
-  const activeProject =
-    projects.find((project) => project.id === activeProjectId) ?? projects[0]
+  const [isDeletingTask, setIsDeletingTask] = useState(false)
+  const activeWorkspace = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
+  )
+  const activeProject = projects.find(
+    (project) => project.id === activeProjectId,
+  )
+  const filteredTasks = tasks.filter((task) => {
+    const searchText = `${task.title} ${task.description ?? ''}`.toLowerCase()
+    const matchesSearch = searchText.includes(taskSearch.trim().toLowerCase())
+
+    const matchesStatus =
+      taskStatusFilter === 'ALL' || task.status === taskStatusFilter
+
+    const matchesPriority =
+      taskPriorityFilter === 'ALL' || task.priority === taskPriorityFilter
+
+    const matchesDueDate =
+      dueDateFilter === 'ALL' ||
+      (dueDateFilter === 'WITH_DUE_DATE' && Boolean(task.dueDate)) ||
+      (dueDateFilter === 'WITHOUT_DUE_DATE' && !task.dueDate)
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesDueDate
+  })
   const shown = events.filter((event) => `${event.title} ${event.detail} ${event.project}`.toLowerCase().includes(query.toLowerCase()))
   const notify = (message: string) => setNotice(message)
   useEffect(() => {
@@ -137,17 +183,25 @@ export default function App() {
   useEffect(() => {
     if (!activeWorkspaceId) {
       setProjects([])
+      setLoadedProjectsWorkspaceId('')
+      setActiveProjectId('')
       return
     }
 
     let cancelled = false
     setIsLoadingProjects(true)
+    setProjects([])
+    setLoadedProjectsWorkspaceId('')
+    setActiveProjectId('')
 
     apiRequest<{ projects: Project[] }>(
       `/api/v1/workspaces/${activeWorkspaceId}/projects`,
     )
       .then(({ projects: loadedProjects }) => {
-        if (!cancelled) setProjects(loadedProjects)
+        if (!cancelled) {
+          setProjects(loadedProjects)
+          setLoadedProjectsWorkspaceId(activeWorkspaceId)
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -166,7 +220,15 @@ export default function App() {
     }
   }, [activeWorkspaceId])
   useEffect(() => {
-    const savedProjectId = localStorage.getItem('devflow-active-project')
+    if (
+      !activeWorkspaceId ||
+      loadedProjectsWorkspaceId !== activeWorkspaceId
+    ) {
+      return
+    }
+
+    const storageKey = getActiveProjectStorageKey(activeWorkspaceId)
+    const savedProjectId = localStorage.getItem(storageKey)
     const selectedProjectId = projects.some(
       (project) => project.id === savedProjectId,
     )
@@ -176,11 +238,11 @@ export default function App() {
     setActiveProjectId(selectedProjectId)
 
     if (selectedProjectId) {
-      localStorage.setItem('devflow-active-project', selectedProjectId)
+      localStorage.setItem(storageKey, selectedProjectId)
     } else {
-      localStorage.removeItem('devflow-active-project')
+      localStorage.removeItem(storageKey)
     }
-  }, [projects])
+  }, [projects, activeWorkspaceId, loadedProjectsWorkspaceId])
   useEffect(() => {
     if (!activeProject?.id) {
       setTasks([])
@@ -208,6 +270,9 @@ export default function App() {
       cancelled = true
     }
   }, [activeProject?.id])
+  useEffect(() => {
+    localStorage.setItem('devflow-active-tab', activeTab)
+  }, [activeTab])
   function toggleTheme() { const next = !dark; setDark(next); localStorage.setItem('devflow-theme', next ? 'dark' : 'light') }
   async function handleSignOut() {
     const { error } = await signOut()
@@ -267,7 +332,10 @@ export default function App() {
 
       setProjects((currentProjects) => [project, ...currentProjects])
       setActiveProjectId(project.id)
-      localStorage.setItem('devflow-active-project', project.id)
+      localStorage.setItem(
+        getActiveProjectStorageKey(activeWorkspaceId),
+        project.id,
+      )
       setProjectModalOpen(false)
       setProjectName('')
       setProjectDescription('')
@@ -396,6 +464,41 @@ export default function App() {
       setIsUpdatingTask(false)
     }
   }
+  async function handleDeleteTask() {
+    if (!editingTask) {
+      return
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete "${editingTask.title}"? This action cannot be undone.`,
+    )
+
+    if (!shouldDelete) {
+      return
+    }
+
+    setIsDeletingTask(true)
+
+    try {
+      await apiRequest<{ success: boolean }>(
+        `/api/v1/tasks/${editingTask.id}`,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      setTasks((currentTasks) =>
+        currentTasks.filter((task) => task.id !== editingTask.id),
+      )
+
+      setEditingTask(null)
+      notify(`Task "${editingTask.title}" deleted`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not delete task')
+    } finally {
+      setIsDeletingTask(false)
+    }
+  }
 
 
   if (isLoading) {
@@ -461,11 +564,14 @@ export default function App() {
                     key={project.id}
                     onClick={() => {
                       setActiveProjectId(project.id)
-                      localStorage.setItem('devflow-active-project', project.id)
+                      localStorage.setItem(
+                        getActiveProjectStorageKey(activeWorkspaceId),
+                        project.id,
+                      )
                     }}
                     className={`flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs hover:bg-black/[.04] dark:hover:bg-white/[.05] max-[680px]:justify-center max-[680px]:px-0 ${activeProject?.id === project.id
-                        ? 'bg-black/[.04] font-semibold dark:bg-white/[.05]'
-                        : 'text-quiet'
+                      ? 'bg-black/[.04] font-semibold dark:bg-white/[.05]'
+                      : 'text-quiet'
                       }`}
                   >
                     <ProjectGlyph color={colors[index % colors.length]} />
@@ -489,12 +595,59 @@ export default function App() {
         <div className="mx-auto max-w-[1120px] px-[42px] max-[900px]:px-[26px] max-[680px]:px-[17px] max-[420px]:px-3">
           <div className="flex min-h-[125px] items-center justify-between gap-5 pt-2 max-[680px]:min-h-[110px]"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-panel text-2xl text-brand shadow-soft max-[680px]:h-[34px] max-[680px]:w-[34px]">✳</div><div><div className="flex items-center gap-2.5"><h1 className="font-display text-[21px] font-bold tracking-tight max-[680px]:text-lg">{activeProject?.name ?? activeWorkspace?.name ?? 'Create your first workspace'}</h1><button className="flex items-center gap-1.5 rounded-full border border-line bg-panel px-2 py-1 text-[10px] text-quiet"><i className="h-1.5 w-1.5 rounded-full bg-emerald-400" />On track<ChevronDown size={13} /></button></div><p className="mt-1 text-[11px] text-quiet max-[680px]:max-w-[180px]">Everything your team is building, in one place.</p></div></div><div className="flex items-center gap-3 max-[680px]:gap-1"><div className="flex -space-x-2 max-[680px]:hidden">{[['MC', 'bg-orange-200 text-orange-900'], ['AP', 'bg-emerald-200 text-emerald-900'], ['NK', 'bg-indigo-200 text-indigo-900'], ['SG', 'bg-pink-200 text-pink-900']].map(([n, c]) => <Avatar key={n} initials={n} color={c} />)}<span className="grid h-7 w-7 place-items-center rounded-full border-2 border-panel bg-brand text-[9px] font-bold text-white">+4</span></div><button onClick={() => notify('Share link copied')} className="flex h-[34px] items-center gap-1.5 rounded-md border border-line bg-panel px-3 text-[11px] font-semibold text-quiet hover:bg-black/[.03] dark:hover:bg-white/[.05]"><Share2 size={15} />Share</button><button aria-label="More project options" onClick={() => notify('More project options')} className="grid h-[30px] w-[30px] place-items-center rounded-md border border-line text-quiet"><MoreHorizontal size={19} /></button></div></div>
           <nav className="flex h-[47px] items-stretch gap-6 overflow-x-auto border-b border-line max-[680px]:gap-4" aria-label="Project sections">{tabs.map(({ label, icon: Icon }) => <button key={label} onClick={() => setActiveTab(label)} className={`relative flex shrink-0 items-center gap-1.5 text-[11px] ${activeTab === label ? 'font-semibold text-brand after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded after:bg-brand' : 'text-quiet hover:text-ink'}`}><Icon size={15} />{label}{label === 'Activity' && <em className="rounded bg-brand-soft px-1.5 py-0.5 text-[9px] not-italic text-brand dark:bg-violet-950">12</em>}</button>)}<button className="text-quiet" aria-label="Add tab" onClick={() => notify('Custom tabs are coming soon')}><CirclePlus size={17} /></button></nav>
+          {['Board', 'List', 'Calendar'].includes(activeTab) && activeProject && (
+            <TaskFilterBar
+              search={taskSearch}
+              status={taskStatusFilter}
+              priority={taskPriorityFilter}
+              dueDate={dueDateFilter}
+              onSearchChange={setTaskSearch}
+              onStatusChange={setTaskStatusFilter}
+              onPriorityChange={setTaskPriorityFilter}
+              onDueDateChange={setDueDateFilter}
+              onClear={() => {
+                setTaskSearch('')
+                setTaskStatusFilter('ALL')
+                setTaskPriorityFilter('ALL')
+                setDueDateFilter('ALL')
+              }}
+            />
+          )}
           {activeTab === 'Activity' ? <section className="max-w-[850px] pt-7"><div className="flex items-center justify-between"><div><h2 className="flex items-center gap-2 font-display text-[15px] font-bold"><Activity size={17} className="text-brand" />Activity</h2><p className="ml-[26px] mt-1.5 text-[11px] text-quiet">Catch up on what’s happening across your project.</p></div><button onClick={() => setFilter(!filter)} className={`flex h-[31px] items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 text-[10px] text-quiet hover:bg-black/[.03] dark:hover:bg-white/[.05] ${filter ? 'text-brand' : ''}`}><Filter size={15} />Filter{filter && <span className="grid h-4 w-4 place-items-center rounded-full bg-brand text-[9px] text-white">1</span>}</button></div>
             {filter && <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] text-quiet"><span>Showing activity from</span>{['Everyone', 'All activity'].map((x) => <button key={x} onClick={() => setFilter(false)} className="flex items-center gap-1 rounded bg-brand-soft px-2 py-1.5 text-brand dark:bg-violet-950">{x}<X size={13} /></button>)}<button onClick={() => setFilter(false)}>Clear filters</button></div>}
             <div className="mb-4 mt-7 flex items-center gap-3 text-[10px] font-semibold text-quiet"><span>Today</span><div className="h-px flex-1 bg-line" /></div>
             {shown.length ? <div>{shown.map((event, index) => { const Icon = event.icon; return <article key={event.title} className="relative flex gap-3 pb-5"><div className={`z-[1] grid h-[25px] w-[25px] shrink-0 place-items-center rounded-lg border border-line bg-panel ${tone[event.tone as keyof typeof tone]}`}><Icon size={15} /></div>{index < shown.length - 1 && <div className="absolute bottom-[-1px] left-3 top-7 w-px bg-line" />}<div className="min-w-0 flex-1"><div className="mb-2 flex min-h-[25px] items-center gap-2"><Avatar initials={event.initials} color={event.avatar} small /><p className="m-0 flex items-center gap-2 text-[10px] max-[680px]:block"><strong className="font-semibold">{event.title}</strong><span className="text-[9px] text-quiet max-[680px]:block">{event.time}</span></p></div><div className="flex min-h-[60px] items-center justify-between rounded-lg border border-line bg-panel px-3 shadow-soft transition hover:-translate-y-px hover:border-violet-300"><div className="flex min-w-0 items-center gap-2.5"><ProjectGlyph color={event.tone} /><div className="flex min-w-0 flex-col gap-1"><strong className="truncate text-[11px] font-semibold">{event.detail}</strong><span className="text-[9px] text-quiet">{event.project} <i className="not-italic">·</i> Updated just now</span></div></div><button onClick={() => notify(`Opened: ${event.detail}`)} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05]" aria-label={`Open ${event.detail}`}><ChevronRight size={16} /></button></div></div></article> })}</div> : <div className="flex min-h-[190px] flex-col items-center justify-center gap-2 text-quiet"><Search size={21} /><strong className="text-xs text-ink">No matching activity</strong><span className="text-[10px]">Try a different search.</span></div>}
             <button onClick={() => notify('You’re viewing the latest activity')} className="ml-[38px] mt-1 flex items-center gap-1.5 text-[10px] text-quiet"><span>You’re all caught up</span><Check size={14} className="text-emerald-500" /></button>
-          </section> : activeTab === 'Board' ? <TaskBoard tasks={tasks} isLoading={isLoadingTasks} hasProject={Boolean(activeProject)} onCreateTask={() => { setTaskTitle(''); setTaskDescription(''); setTaskStatus('TODO'); setTaskPriority('MEDIUM'); setTaskModalOpen(true) }} onUpdateStatus={handleUpdateTaskStatus} onEditTask={openTaskEditor}/> : <section className="flex h-[430px] flex-col items-center justify-center text-center"><div className="grid h-12 w-12 place-items-center rounded-xl bg-brand-soft text-brand dark:bg-violet-950"><FolderKanban size={22} /></div><h2 className="mt-4 font-display text-[17px] font-bold">{activeTab} is ready for your team</h2><p className="mb-4 mt-1 text-[11px] text-quiet">Project {activeTab.toLowerCase()} will show up here as you build out DevFlow.</p><button onClick={() => setActiveTab('Activity')} className="rounded-md bg-brand px-3 py-2 text-[11px] font-semibold text-white">Back to activity</button></section>}
+          </section> : activeTab === 'Board' ? (
+            <TaskBoard
+              tasks={filteredTasks}
+              isLoading={isLoadingTasks}
+              hasProject={Boolean(activeProject)}
+              onCreateTask={() => {
+                setTaskTitle('')
+                setTaskDescription('')
+                setTaskStatus('TODO')
+                setTaskPriority('MEDIUM')
+                setTaskModalOpen(true)
+              }}
+              onUpdateStatus={handleUpdateTaskStatus}
+              onEditTask={openTaskEditor}
+            />
+          ) : activeTab === 'List' ? (
+            <TaskList
+              tasks={filteredTasks}
+              isLoading={isLoadingTasks}
+              hasProject={Boolean(activeProject)}
+              onEditTask={openTaskEditor}
+            />
+          ) : activeTab === 'Calendar' ? (
+            <TaskCalendar
+              tasks={filteredTasks}
+              isLoading={isLoadingTasks}
+              hasProject={Boolean(activeProject)}
+              onEditTask={openTaskEditor}
+            />
+          ) : (<section className="flex h-[430px] flex-col items-center justify-center text-center"><div className="grid h-12 w-12 place-items-center rounded-xl bg-brand-soft text-brand dark:bg-violet-950"><FolderKanban size={22} /></div><h2 className="mt-4 font-display text-[17px] font-bold">{activeTab} is ready for your team</h2><p className="mb-4 mt-1 text-[11px] text-quiet">Project {activeTab.toLowerCase()} will show up here as you build out DevFlow.</p><button onClick={() => setActiveTab('Activity')} className="rounded-md bg-brand px-3 py-2 text-[11px] font-semibold text-white">Back to activity</button></section>)}
           <footer className="mt-[72px] flex justify-between border-t border-line py-4 text-[9px] text-quiet"><span>Made for teams that build</span><span className="flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-full bg-emerald-400" />All systems operational</span></footer>
         </div>
       </main>
@@ -785,18 +938,32 @@ export default function App() {
             className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none focus:border-brand"
           />
 
-          <div className="mt-5 flex justify-end gap-2">
+          <div className="mt-5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleDeleteTask()}
+              disabled={isDeletingTask || isUpdatingTask}
+              className="mr-auto rounded-md px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-rose-950"
+            >
+              {isDeletingTask ? 'Deleting…' : 'Delete task'}
+            </button>
+
             <button
               type="button"
               onClick={() => setEditingTask(null)}
-              className="rounded-md border border-line px-3 py-2 text-sm text-quiet"
+              disabled={isDeletingTask}
+              className="rounded-md border border-line px-3 py-2 text-sm text-quiet disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              disabled={isUpdatingTask || editTaskTitle.trim().length < 2}
+              disabled={
+                isUpdatingTask ||
+                isDeletingTask ||
+                editTaskTitle.trim().length < 2
+              }
               className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isUpdatingTask ? 'Saving…' : 'Save changes'}
@@ -835,6 +1002,19 @@ function TaskBoard({
     MEDIUM: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
     HIGH: 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
   }
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null)
+
+  function handleDrop(status: TaskStatus) {
+    const draggedTask = tasks.find((task) => task.id === draggedTaskId)
+
+    if (draggedTask && draggedTask.status !== status) {
+      onUpdateStatus(draggedTask.id, status)
+    }
+
+    setDraggedTaskId(null)
+    setDropTarget(null)
+  }
 
   if (!hasProject) {
     return (
@@ -866,14 +1046,42 @@ function TaskBoard({
             const columnTasks = tasks.filter((task) => task.status === status)
 
             return (
-              <section key={status} className="min-h-[260px] rounded-xl border border-line bg-black/[.015] p-3 dark:bg-white/[.02]">
+              <section
+                key={status}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  setDropTarget(status)
+                }}
+                onDragLeave={() => setDropTarget(null)}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  handleDrop(status)
+                }}
+                className={`min-h-[260px] rounded-xl border p-3 transition ${dropTarget === status
+                  ? 'border-brand bg-brand-soft dark:bg-violet-950/40'
+                  : 'border-line bg-black/[.015] dark:bg-white/[.02]'
+                  }`}
+              >
                 <div className="mb-3 flex items-center justify-between px-1">
                   <h3 className="flex items-center gap-2 text-xs font-semibold"><i className={`h-2 w-2 rounded-full ${dot}`} />{label}</h3>
                   <span className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-quiet">{columnTasks.length}</span>
                 </div>
                 <div className="space-y-2">
                   {columnTasks.map((task) => (
-                    <article key={task.id} className="rounded-lg border border-line bg-panel p-3 shadow-soft">
+                    <article
+                      key={task.id}
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'move'
+                        setDraggedTaskId(task.id)
+                      }}
+                      onDragEnd={() => {
+                        setDraggedTaskId(null)
+                        setDropTarget(null)
+                      }}
+                      className={`cursor-grab rounded-lg border border-line bg-panel p-3 shadow-soft transition active:cursor-grabbing ${draggedTaskId === task.id ? 'opacity-50' : ''
+                        }`}
+                    >
                       <button
                         type="button"
                         onClick={() => onEditTask(task)}
@@ -915,6 +1123,421 @@ function TaskBoard({
         </div>
       )}
     </section>
+  )
+}
+
+function TaskList({
+  tasks,
+  isLoading,
+  hasProject,
+  onEditTask,
+}: {
+  tasks: Task[]
+  isLoading: boolean
+  hasProject: boolean
+  onEditTask: (task: Task) => void
+}) {
+  const statusStyles: Record<TaskStatus, string> = {
+    TODO: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    IN_PROGRESS:
+      'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+    DONE: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  }
+
+  const priorityStyles: Record<TaskPriority, string> = {
+    LOW: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    MEDIUM:
+      'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+    HIGH: 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
+  }
+
+  if (!hasProject) {
+    return (
+      <section className="flex h-[380px] flex-col items-center justify-center text-center">
+        <List size={24} className="text-brand" />
+        <h2 className="mt-3 font-display text-lg font-bold">Select a project</h2>
+        <p className="mt-1 text-sm text-quiet">
+          Create or select a project to view its tasks.
+        </p>
+      </section>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <section className="flex h-[380px] items-center justify-center">
+        <p className="text-sm text-quiet">Loading tasks…</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="pt-7">
+      <div className="mb-5">
+        <h2 className="font-display text-[17px] font-bold">Task list</h2>
+        <p className="mt-1 text-[11px] text-quiet">
+          View and edit every task in this project.
+        </p>
+      </div>
+
+      {tasks.length ? (
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+          <table className="w-full min-w-[700px] border-collapse text-left">
+            <thead className="border-b border-line bg-black/[.02] text-[10px] uppercase tracking-wide text-quiet dark:bg-white/[.03]">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Task</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Priority</th>
+                <th className="px-4 py-3 font-semibold">Due date</th>
+                <th className="px-4 py-3 text-right font-semibold">Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {tasks.map((task) => (
+                <tr
+                  key={task.id}
+                  className="border-b border-line last:border-0 hover:bg-black/[.02] dark:hover:bg-white/[.03]"
+                >
+                  <td className="max-w-[320px] px-4 py-3">
+                    <strong className="block truncate text-xs">{task.title}</strong>
+
+                    {task.description && (
+                      <span className="mt-1 block truncate text-[10px] text-quiet">
+                        {task.description}
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded px-2 py-1 text-[10px] font-semibold ${statusStyles[task.status]}`}
+                    >
+                      {task.status.replace('_', ' ').toLowerCase()}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded px-2 py-1 text-[10px] font-semibold ${priorityStyles[task.priority]}`}
+                    >
+                      {task.priority.toLowerCase()}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-3 text-[11px] text-quiet">
+                    {task.dueDate
+                      ? new Date(task.dueDate).toLocaleDateString()
+                      : 'No due date'}
+                  </td>
+
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onEditTask(task)}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-[10px] font-semibold text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05]"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-line text-center">
+          <List size={22} className="text-quiet" />
+          <strong className="mt-3 text-sm">No tasks yet</strong>
+          <p className="mt-1 text-[11px] text-quiet">
+            Create a task from the Board tab to see it here.
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function TaskCalendar({
+  tasks,
+  isLoading,
+  hasProject,
+  onEditTask,
+}: {
+  tasks: Task[]
+  isLoading: boolean
+  hasProject: boolean
+  onEditTask: (task: Task) => void
+}) {
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  })
+
+  const year = visibleMonth.getFullYear()
+  const month = visibleMonth.getMonth()
+  const firstDayOfMonth = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const leadingEmptyDays = firstDayOfMonth.getDay()
+  const totalCells = Math.ceil((leadingEmptyDays + daysInMonth) / 7) * 7
+
+  const calendarDays = Array.from({ length: totalCells }, (_, index) => {
+    const dayNumber = index - leadingEmptyDays + 1
+
+    if (dayNumber < 1 || dayNumber > daysInMonth) {
+      return null
+    }
+
+    return new Date(year, month, dayNumber)
+  })
+
+  const today = new Date()
+
+  function isSameDay(firstDate: Date, secondDate: Date) {
+    return (
+      firstDate.getFullYear() === secondDate.getFullYear() &&
+      firstDate.getMonth() === secondDate.getMonth() &&
+      firstDate.getDate() === secondDate.getDate()
+    )
+  }
+
+  function getTasksForDay(date: Date) {
+    return tasks.filter((task) => {
+      if (!task.dueDate) {
+        return false
+      }
+
+      return isSameDay(new Date(task.dueDate), date)
+    })
+  }
+
+  if (!hasProject) {
+    return (
+      <section className="flex h-[380px] flex-col items-center justify-center text-center">
+        <CalendarDays size={24} className="text-brand" />
+        <h2 className="mt-3 font-display text-lg font-bold">
+          Select a project
+        </h2>
+        <p className="mt-1 text-sm text-quiet">
+          Create or select a project to view its task calendar.
+        </p>
+      </section>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <section className="flex h-[380px] items-center justify-center">
+        <p className="text-sm text-quiet">Loading tasks…</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="pt-7">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-[17px] font-bold">Calendar</h2>
+          <p className="mt-1 text-[11px] text-quiet">
+            Tasks appear on their due date.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setVisibleMonth(new Date(year, month - 1, 1))}
+            className="grid h-8 w-8 place-items-center rounded-md border border-line text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05]"
+            aria-label="Previous month"
+          >
+            <ChevronRight size={16} className="rotate-180" />
+          </button>
+
+          <strong className="min-w-32 text-center text-xs">
+            {visibleMonth.toLocaleString('default', {
+              month: 'long',
+              year: 'numeric',
+            })}
+          </strong>
+
+          <button
+            type="button"
+            onClick={() => setVisibleMonth(new Date(year, month + 1, 1))}
+            className="grid h-8 w-8 place-items-center rounded-md border border-line text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05]"
+            aria-label="Next month"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+        <div className="min-w-[720px]">
+          <div className="grid grid-cols-7 border-b border-line bg-black/[.02] dark:bg-white/[.03]">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+              (dayName) => (
+                <div
+                  key={dayName}
+                  className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-quiet"
+                >
+                  {dayName}
+                </div>
+              ),
+            )}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {calendarDays.map((date, index) => {
+              if (!date) {
+                return (
+                  <div
+                    key={`empty-${index}`}
+                    className="min-h-28 border-b border-r border-line bg-black/[.01] dark:bg-white/[.01]"
+                  />
+                )
+              }
+
+              const dayTasks = getTasksForDay(date)
+              const isToday = isSameDay(date, today)
+
+              return (
+                <div
+                  key={date.toISOString()}
+                  className="min-h-28 border-b border-r border-line p-2 last:border-r-0"
+                >
+                  <span
+                    className={`grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold ${
+                      isToday ? 'bg-brand text-white' : 'text-quiet'
+                    }`}
+                  >
+                    {date.getDate()}
+                  </span>
+
+                  <div className="mt-1.5 space-y-1">
+                    {dayTasks.slice(0, 3).map((task) => (
+                      <button
+                        key={task.id}
+                        type="button"
+                        onClick={() => onEditTask(task)}
+                        className="block w-full truncate rounded bg-brand-soft px-1.5 py-1 text-left text-[9px] font-medium text-brand hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300"
+                        title={task.title}
+                      >
+                        {task.title}
+                      </button>
+                    ))}
+
+                    {dayTasks.length > 3 && (
+                      <span className="block px-1 text-[9px] text-quiet">
+                        +{dayTasks.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[10px] text-quiet">
+        Tasks without a due date do not appear on the calendar.
+      </p>
+    </section>
+  )
+}
+
+function TaskFilterBar({
+  search,
+  status,
+  priority,
+  dueDate,
+  onSearchChange,
+  onStatusChange,
+  onPriorityChange,
+  onDueDateChange,
+  onClear,
+}: {
+  search: string
+  status: TaskStatus | 'ALL'
+  priority: TaskPriority | 'ALL'
+  dueDate: DueDateFilter
+  onSearchChange: (value: string) => void
+  onStatusChange: (value: TaskStatus | 'ALL') => void
+  onPriorityChange: (value: TaskPriority | 'ALL') => void
+  onDueDateChange: (value: DueDateFilter) => void
+  onClear: () => void
+}) {
+  const hasActiveFilters =
+    Boolean(search) ||
+    status !== 'ALL' ||
+    priority !== 'ALL' ||
+    dueDate !== 'ALL'
+
+  return (
+    <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3">
+      <label className="flex h-9 min-w-[180px] flex-1 items-center gap-2 rounded-md border border-line bg-canvas px-2.5 text-quiet">
+        <Search size={15} />
+
+        <input
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Search tasks..."
+          className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-quiet"
+        />
+      </label>
+
+      <select
+        value={status}
+        onChange={(event) =>
+          onStatusChange(event.target.value as TaskStatus | 'ALL')
+        }
+        className="h-9 rounded-md border border-line bg-canvas px-2 text-xs text-ink outline-none focus:border-brand"
+        aria-label="Filter by status"
+      >
+        <option value="ALL">All statuses</option>
+        <option value="TODO">Todo</option>
+        <option value="IN_PROGRESS">In progress</option>
+        <option value="DONE">Done</option>
+      </select>
+
+      <select
+        value={priority}
+        onChange={(event) =>
+          onPriorityChange(event.target.value as TaskPriority | 'ALL')
+        }
+        className="h-9 rounded-md border border-line bg-canvas px-2 text-xs text-ink outline-none focus:border-brand"
+        aria-label="Filter by priority"
+      >
+        <option value="ALL">All priorities</option>
+        <option value="LOW">Low priority</option>
+        <option value="MEDIUM">Medium priority</option>
+        <option value="HIGH">High priority</option>
+      </select>
+
+      <select
+        value={dueDate}
+        onChange={(event) =>
+          onDueDateChange(event.target.value as DueDateFilter)
+        }
+        className="h-9 rounded-md border border-line bg-canvas px-2 text-xs text-ink outline-none focus:border-brand"
+        aria-label="Filter by due date"
+      >
+        <option value="ALL">Any due date</option>
+        <option value="WITH_DUE_DATE">Has due date</option>
+        <option value="WITHOUT_DUE_DATE">No due date</option>
+      </select>
+
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="flex h-9 items-center gap-1 rounded-md px-2 text-xs text-quiet hover:bg-black/[.04] dark:hover:bg-white/[.05]"
+        >
+          <X size={14} />
+          Clear
+        </button>
+      )}
+    </div>
   )
 }
 

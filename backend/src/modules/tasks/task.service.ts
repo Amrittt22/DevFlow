@@ -107,3 +107,30 @@ export async function updateTask(
     })
   })
 }
+export async function deleteTask(taskId: string, userId: string) {
+  return prisma.$transaction(async (transaction) => {
+    const task = await transaction.task.findFirst({
+      where: {
+        id: taskId,
+        project: {
+          workspace: {
+            members: {
+              some: { userId },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    })
+
+    if (!task) {
+      return false
+    }
+
+    await transaction.task.delete({
+      where: { id: taskId },
+    })
+
+    return true
+  })
+}
