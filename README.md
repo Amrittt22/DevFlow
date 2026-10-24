@@ -241,7 +241,9 @@ npm run build
 - Workspace member invitations and roles
 - Task comments and activity history
 - Notifications
+- Real-time task, comment, and notification updates
 - Timeline view and sprint planning
 - Issue tracking
+- GitHub repository and pull request integration
 - Automated tests
 - Docker, Docker Compose, Redis, GitHub Actions, and deployment

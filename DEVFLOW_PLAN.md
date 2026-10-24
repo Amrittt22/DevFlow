@@ -87,6 +87,7 @@ A team can create, find, assign, prioritize, schedule, edit, delete, and complet
 - Add task comments.
 - Record activity for task creation, edits, status changes, assignments, comments, and deletion.
 - Add in-app notifications for assignments, comments, and approaching due dates.
+- Add real-time task, comment, and notification updates for active workspace members.
 
 ### Exit check
 
@@ -172,12 +173,24 @@ The main user journey is reliable, accessible, tested, and easy to demonstrate.
 
 A reviewer can clone, build, test, and run DevFlow consistently, then access a deployed demo.
 
-## Later milestones
+## Phase 7 — GitHub integration
 
-These are not part of the core plan until the application is stable.
+### Goals
 
-- GitHub repository and pull request integration.
-- Real-time task updates and notifications.
+- Connect a workspace or project to a GitHub repository.
+- Link tasks and issues to pull requests.
+- Show pull request status, branch, author, and review state in DevFlow.
+- Receive verified GitHub webhooks for pull request and issue updates.
+- Record GitHub events in the DevFlow activity history.
+
+### Exit check
+
+A team can connect a repository and track related pull request work from DevFlow.
+
+## Later milestone — AI features
+
+AI features begin only after the core application, real-time collaboration, and GitHub integration are stable.
+
 - AI task suggestions, issue breakdowns, pull request summaries, and release-note drafts.
 
 ## Working rules
