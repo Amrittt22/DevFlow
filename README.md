@@ -20,6 +20,12 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Calendar view for tasks with due dates.
 - Search tasks by title or description.
 - Filter tasks by status, priority, and due-date availability.
+- Reusable workspace labels with custom colors.
+- Create labels directly from create-task and edit-task forms.
+- Assign and remove labels from tasks.
+- Label badges in Board and List views, plus label color indicators in Calendar.
+- Selected workspace, project, and Board/List/Calendar tab persist after refresh.
+- Frontend code organized into shared types, hooks, task views, and modal components.
 - Protected backend authorization checks for workspace-scoped data.
 - Prisma 7 Client with a PostgreSQL driver adapter.
 
@@ -29,10 +35,11 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 Sign in
 → Create or select a workspace
 → Create or select a project
-→ Create tasks
+→ Create workspace labels
+→ Create tasks and assign labels
 → View tasks in Board, List, or Calendar
 → Search and filter tasks
-→ Edit, delete, or move tasks between statuses
+→ Edit, delete, label, or move tasks between statuses
 ```
 
 ## Project layout
@@ -41,10 +48,12 @@ Sign in
 DevFlow/
 ├── frontend/              # React, TypeScript, Vite, Tailwind CSS
 │   └── src/
-│       ├── app/
-│       ├── features/
-│       ├── lib/
-│       └── services/
+│       ├── app/           # App shell and shared application types
+│       ├── components/    # Task views and reusable modals
+│       ├── features/      # Authentication feature
+│       ├── hooks/         # Workspace, task, and label data hooks
+│       ├── lib/           # API and Supabase clients
+│       └── services/      # Authentication and backend services
 ├── backend/               # Express API, Prisma, Supabase integration
 │   ├── prisma/
 │   └── src/
@@ -136,6 +145,9 @@ Open the Vite URL, usually `http://localhost:5173`.
 | `POST` | `/api/v1/projects/:projectId/tasks` | Create a task in a project. | Bearer token required |
 | `PATCH` | `/api/v1/tasks/:taskId` | Update task details or status. | Bearer token required |
 | `DELETE` | `/api/v1/tasks/:taskId` | Delete a task. | Bearer token required |
+| `GET` | `/api/v1/workspaces/:workspaceId/labels` | List labels in a workspace. | Bearer token required |
+| `POST` | `/api/v1/workspaces/:workspaceId/labels` | Create a workspace label. | Bearer token required |
+| `PUT` | `/api/v1/tasks/:taskId/labels` | Replace labels assigned to a task. | Bearer token required |
 
 ## Example request bodies
 
@@ -185,6 +197,28 @@ Valid task priorities are `LOW`, `MEDIUM`, and `HIGH`.
 
 Send `null` for `description` or `dueDate` to remove the current value.
 
+Create a label:
+
+```json
+{
+  "name": "Bug",
+  "color": "#EF4444"
+}
+```
+
+Set task labels:
+
+```json
+{
+  "labelIds": [
+    "label-id-1",
+    "label-id-2"
+  ]
+}
+```
+
+A label must belong to the same workspace as the task. A task can have up to 10 labels.
+
 ## Production builds
 
 Build the frontend:
@@ -203,7 +237,6 @@ npm run build
 
 ## Planned features
 
-- Task labels
 - Task assignments
 - Workspace member invitations and roles
 - Task comments and activity history

@@ -6,7 +6,7 @@ DevFlow is a full-stack collaboration platform where software teams can plan pro
 
 ## Current progress
 
-The foundation is complete and the project is approximately **45% complete** against this expanded plan.
+The foundation is complete and the project is approximately **50% complete** against this expanded plan.
 
 ### Completed
 
@@ -21,6 +21,13 @@ The foundation is complete and the project is approximately **45% complete** aga
 - Task List view.
 - Calendar view with due-date navigation and task editing.
 - Task search and filters for status, priority, and due dates.
+- Reusable workspace labels with custom names and colors.
+- Create labels from task forms and assign or remove labels from tasks.
+- Labels displayed in Board, List, and Calendar views.
+- Task-label authorization checks ensure labels belong to the task workspace.
+- Workspace, project, and active-tab persistence after browser refresh.
+- Frontend refactor: separated app types, data hooks, task views, and modal components.
+- Frontend and backend production builds pass after the refactor.
 - Responsive Tailwind interface with light and dark modes.
 
 ## Core user journey
@@ -29,7 +36,7 @@ The foundation is complete and the project is approximately **45% complete** aga
 Sign in
 → Create or select a workspace
 → Create or select a project
-→ Create, edit, assign, and organize tasks
+→ Create, label, prioritize, schedule, edit, delete, and complete tasks
 → Collaborate through comments and activity
 → Plan work in sprints and track progress
 ```
@@ -50,13 +57,20 @@ Sign in
 
 ## Phase 1 — Complete task management
 
-### Goals
+### Completed
 
-- Add a Calendar view for tasks with due dates.
-- Add search, filters, and sorting by status, priority, due date, label, and assignee.
-- Add reusable task labels such as `bug`, `frontend`, `design`, and `urgent`.
-- Add task assignment to workspace members.
-- Improve empty, loading, error, and confirmation states.
+- [x] Add a Calendar view for tasks with due dates.
+- [x] Add task search and filters for status, priority, and due date.
+- [x] Add reusable workspace labels with custom colors.
+- [x] Allow labels to be assigned and removed from tasks.
+- [x] Improve task loading, empty, error, and confirmation states.
+- [x] Preserve the selected workspace, project, and view after refresh.
+
+### Remaining
+
+- [ ] Add sorting by status, priority, due date, label, and assignee.
+- [ ] Add task assignment to workspace members.
+- [ ] Improve task-form keyboard and accessibility behavior.
 
 ### Exit check
 

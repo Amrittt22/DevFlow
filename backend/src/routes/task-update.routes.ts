@@ -1,7 +1,16 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.middleware.js'
-import { deleteTask,updateTask } from '../modules/tasks/task.service.js'
-import { updateTaskSchema } from '../modules/tasks/task.schemas.js'
+import {
+  deleteTask,
+  InvalidTaskLabelsError,
+  setTaskLabels,
+  updateTask,
+} from '../modules/tasks/task.service.js'
+import {
+  setTaskLabelsSchema,
+  updateTaskSchema,
+} from '../modules/tasks/task.schemas.js'
+
 
 const taskUpdateRouter = Router()
 
@@ -41,6 +50,49 @@ taskUpdateRouter.patch('/:taskId', requireAuth, async (request, response) => {
     response.status(500).json({ error: 'Unable to update task' })
   }
 })
+
+taskUpdateRouter.put('/:taskId/labels', requireAuth, async (request, response) => {
+  const taskId = request.params.taskId
+
+  if (typeof taskId !== 'string') {
+    response.status(400).json({ error: 'A valid task ID is required' })
+    return
+  }
+
+  const result = setTaskLabelsSchema.safeParse(request.body)
+
+  if (!result.success) {
+    response.status(400).json({
+      error: 'Invalid label data',
+      details: result.error.flatten().fieldErrors,
+    })
+    return
+  }
+
+  try {
+    const task = await setTaskLabels(
+      taskId,
+      response.locals.authUser.id,
+      result.data.labelIds,
+    )
+
+    if (!task) {
+      response.status(403).json({ error: 'You cannot access this task' })
+      return
+    }
+
+    response.status(200).json({ task })
+  } catch (error) {
+    if (error instanceof InvalidTaskLabelsError) {
+      response.status(400).json({ error: error.message })
+      return
+    }
+
+    console.error('Task label update failed:', error)
+    response.status(500).json({ error: 'Unable to update task labels' })
+  }
+})
+
 taskUpdateRouter.delete('/:taskId', requireAuth, async (request, response) => {
   const taskId = request.params.taskId
 

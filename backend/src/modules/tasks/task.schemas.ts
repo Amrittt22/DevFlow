@@ -47,6 +47,16 @@ export const updateTaskSchema = z
     'Send at least one field to update',
   )
 
+export const setTaskLabelsSchema = z.object({
+  labelIds: z
+    .array(z.string().cuid())
+    .max(10, 'A task can have at most 10 labels')
+    .refine(
+      (labelIds) => new Set(labelIds).size === labelIds.length,
+      'Labels must be unique',
+    ),
+})
+
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>
