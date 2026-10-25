@@ -57,6 +57,16 @@ export const setTaskLabelsSchema = z.object({
     ),
 })
 
+export const setTaskAssigneesSchema = z.object({
+  userIds: z
+    .array(z.string().min(1, 'Assignee IDs must not be empty'))
+    .max(10, 'A task can have at most 10 assignees')
+    .refine(
+      (userIds) => new Set(userIds).size === userIds.length,
+      'Assignees must be unique',
+    ),
+})
+
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>

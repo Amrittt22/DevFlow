@@ -16,7 +16,17 @@ export type Label = {
   name: string
   color: string
 }
+export type TaskAssignee = {
+  id: string
+  email: string
+  displayName: string | null
+}
 
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
+export type WorkspaceMember = TaskAssignee & {
+  role: WorkspaceRole
+}
 export type Task = {
   id: string
   title: string
@@ -28,4 +38,5 @@ export type Task = {
   createdAt: string
   updatedAt: string
   labels: Label[]
+  assignees: TaskAssignee[]
 }

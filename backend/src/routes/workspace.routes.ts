@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.middleware.js'
 import {
   createWorkspace,
   listWorkspacesForUser,
+  listWorkspaceMembers,
 } from '../modules/workspaces/workspace.service.js'
 import { createWorkspaceSchema } from '../modules/workspaces/workspace.schemas.js'
 
@@ -47,5 +48,41 @@ workspaceRouter.post('/', requireAuth, async (request, response) => {
     response.status(500).json({ error: 'Unable to create workspace' })
   }
 })
+
+workspaceRouter.get(
+  '/:workspaceId/members',
+  requireAuth,
+  async (request, response) => {
+    const workspaceId = request.params.workspaceId
+
+    if (typeof workspaceId !== 'string') {
+      response.status(400).json({
+        error: 'A valid workspace ID is required',
+      })
+      return
+    }
+
+    try {
+      const members = await listWorkspaceMembers(
+        workspaceId,
+        response.locals.authUser.id,
+      )
+
+      if (!members) {
+        response.status(403).json({
+          error: 'You are not a member of this workspace',
+        })
+        return
+      }
+
+      response.status(200).json({ members })
+    } catch (error) {
+      console.error('Workspace member listing failed:', error)
+      response.status(500).json({
+        error: 'Unable to load workspace members',
+      })
+    }
+  },
+)
 
 export default workspaceRouter

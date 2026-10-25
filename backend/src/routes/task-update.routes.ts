@@ -2,13 +2,17 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.middleware.js'
 import {
   deleteTask,
+  InvalidTaskAssigneesError,
   InvalidTaskLabelsError,
+  setTaskAssignees,
   setTaskLabels,
   updateTask,
 } from '../modules/tasks/task.service.js'
 import {
   setTaskLabelsSchema,
+  setTaskAssigneesSchema,
   updateTaskSchema,
+  
 } from '../modules/tasks/task.schemas.js'
 
 
@@ -92,7 +96,55 @@ taskUpdateRouter.put('/:taskId/labels', requireAuth, async (request, response) =
     response.status(500).json({ error: 'Unable to update task labels' })
   }
 })
+taskUpdateRouter.put(
+  '/:taskId/assignees',
+  requireAuth,
+  async (request, response) => {
+    const taskId = request.params.taskId
 
+    if (typeof taskId !== 'string') {
+      response.status(400).json({ error: 'A valid task ID is required' })
+      return
+    }
+
+    const result = setTaskAssigneesSchema.safeParse(request.body)
+
+    if (!result.success) {
+      response.status(400).json({
+        error: 'Invalid assignee data',
+        details: result.error.flatten().fieldErrors,
+      })
+      return
+    }
+
+    try {
+      const task = await setTaskAssignees(
+        taskId,
+        response.locals.authUser.id,
+        result.data.userIds,
+      )
+
+      if (!task) {
+        response.status(403).json({
+          error: 'You cannot access this task',
+        })
+        return
+      }
+
+      response.status(200).json({ task })
+    } catch (error) {
+      if (error instanceof InvalidTaskAssigneesError) {
+        response.status(400).json({ error: error.message })
+        return
+      }
+
+      console.error('Task assignee update failed:', error)
+      response.status(500).json({
+        error: 'Unable to update task assignees',
+      })
+    }
+  },
+)
 taskUpdateRouter.delete('/:taskId', requireAuth, async (request, response) => {
   const taskId = request.params.taskId
 

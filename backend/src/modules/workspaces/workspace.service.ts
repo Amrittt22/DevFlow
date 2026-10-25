@@ -76,3 +76,48 @@ export async function listWorkspacesForUser(userId: string) {
     role,
   }))
 }
+
+export async function listWorkspaceMembers(
+  workspaceId: string,
+  userId: string,
+) {
+  const membership = await prisma.workspaceMember.findUnique({
+    where: {
+      userId_workspaceId: {
+        userId,
+        workspaceId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  if (!membership) {
+    return null
+  }
+
+  const members = await prisma.workspaceMember.findMany({
+    where: {
+      workspaceId,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    select: {
+      role: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+        },
+      },
+    },
+  })
+
+  return members.map(({ role, user }) => ({
+    ...user,
+    role,
+  }))
+}

@@ -56,23 +56,39 @@ export function useTaskData(
     status: TaskStatus
     priority: TaskPriority
     labelIds: string[]
+    assigneeIds: string[]
   }) {
     if (!projectId) throw new Error('Select a project before creating a task')
     setIsCreatingTask(true)
+    const { labelIds, assigneeIds, ...taskInput } = input
     try {
       const { task } = await apiRequest<{ task: Task }>(`/api/v1/projects/${projectId}/tasks`, {
         method: 'POST',
-        body: JSON.stringify({ ...input, description: input.description || undefined }),
+        body: JSON.stringify({
+          ...taskInput,
+          description: taskInput.description || undefined,
+        }),
       })
       let taskWithLabels = task
-      if (input.labelIds.length > 0) {
+      if (labelIds.length > 0) {
         const response = await apiRequest<{ task: Task }>(
           `/api/v1/tasks/${task.id}/labels`,
           {
             method: 'PUT',
-            body: JSON.stringify({ labelIds: input.labelIds }),
+            body: JSON.stringify({ labelIds }),
           },
         )
+        taskWithLabels = response.task
+      }
+      if (assigneeIds.length > 0) {
+        const response = await apiRequest<{ task: Task }>(
+          `/api/v1/tasks/${task.id}/assignees`,
+          {
+            method: 'PUT',
+            body: JSON.stringify({ userIds: assigneeIds }),
+          },
+        )
+
         taskWithLabels = response.task
       }
       setTasks((current) => [taskWithLabels, ...current])
@@ -108,7 +124,24 @@ export function useTaskData(
     setTasks((current) => current.map((item) => item.id === task.id ? task : item))
     return task
   }
+async function setTaskAssignees(
+  taskId: string,
+  userIds: string[],
+) {
+  const { task } = await apiRequest<{ task: Task }>(
+    `/api/v1/tasks/${taskId}/assignees`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ userIds }),
+    },
+  )
 
+  setTasks((current) =>
+    current.map((item) => (item.id === task.id ? task : item)),
+  )
+
+  return task
+}
   async function deleteTask(task: Task) {
     setIsDeletingTask(true)
     try {
@@ -143,6 +176,7 @@ export function useTaskData(
     createTask,
     updateTask,
     setTaskLabels,
+    setTaskAssignees,
     deleteTask,
   }
 }

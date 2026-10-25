@@ -25,9 +25,20 @@ const taskFields = {
       },
     },
   },
+  assignees: {
+  select: {
+    user: {
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+      },
+    },
+  },
+},
 } as const
 
-type TaskWithLabels = {
+type TaskWithRelations = {
   labels: Array<{
     label: {
       id: string
@@ -35,14 +46,22 @@ type TaskWithLabels = {
       color: string
     }
   }>
+  assignees: Array<{
+    user: {
+      id: string
+      email: string
+      displayName: string | null
+    }
+  }>
 }
 
-function formatTask<T extends TaskWithLabels>(task: T) {
-  const { labels, ...taskData } = task
+function formatTask<T extends TaskWithRelations>(task: T) {
+  const { labels, assignees, ...taskData } = task
 
   return {
     ...taskData,
     labels: labels.map(({ label }) => label),
+    assignees: assignees.map(({ user }) => user),
   }
 }
 
@@ -51,6 +70,13 @@ export class InvalidTaskLabelsError extends Error {
     super('One or more labels do not belong to this workspace')
   }
 }
+
+export class InvalidTaskAssigneesError extends Error {
+  constructor() {
+    super('One or more assignees do not belong to this workspace')
+  }
+}
+
 
 async function canAccessProject(projectId: string, userId: string) {
   return prisma.project.findFirst({
@@ -216,6 +242,79 @@ export async function setTaskLabels(
 
     const updatedTask = await transaction.task.findUniqueOrThrow({
       where: { id: taskId },
+      select: taskFields,
+    })
+
+    return formatTask(updatedTask)
+  })
+}
+
+export async function setTaskAssignees(
+  taskId: string,
+  userId: string,
+  assigneeIds: string[],
+) {
+  return prisma.$transaction(async (transaction) => {
+    const task = await transaction.task.findFirst({
+      where: {
+        id: taskId,
+        project: {
+          workspace: {
+            members: {
+              some: { userId },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        project: {
+          select: {
+            workspaceId: true,
+          },
+        },
+      },
+    })
+
+    if (!task) {
+      return null
+    }
+
+    const matchingMembers = await transaction.workspaceMember.findMany({
+      where: {
+        workspaceId: task.project.workspaceId,
+        userId: {
+          in: assigneeIds,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    })
+
+    if (matchingMembers.length !== assigneeIds.length) {
+      throw new InvalidTaskAssigneesError()
+    }
+
+    await transaction.taskAssignee.deleteMany({
+      where: {
+        taskId,
+      },
+    })
+
+    if (assigneeIds.length > 0) {
+      await transaction.taskAssignee.createMany({
+        data: assigneeIds.map((assigneeId) => ({
+          taskId,
+          userId: assigneeId,
+        })),
+      })
+    }
+
+    const updatedTask = await transaction.task.findUniqueOrThrow({
+      where: {
+        id: taskId,
+      },
       select: taskFields,
     })
 

@@ -7,6 +7,7 @@ import { fetchCurrentUserFromBackend, type Workspace } from '../services/api.ser
 import { useWorkspaceData } from '../hooks/useWorkspaceData'
 import { useTaskData } from '../hooks/useTaskData'
 import { useLabelData } from '../hooks/useLabelData'
+import { useWorkspaceMembers } from '../hooks/useWorkspaceMembers'
 import type { Task, TaskStatus } from './types'
 import { TaskBoard, TaskCalendar, TaskFilterBar, TaskList } from '../components/tasks/TaskViews'
 import { CreateTaskModal, EditTaskModal, ProjectModal, WorkspaceModal } from '../components/modals/TaskModals'
@@ -35,12 +36,15 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [createTaskLabelIds, setCreateTaskLabelIds] = useState<string[]>([])
   const [editTaskLabelIds, setEditTaskLabelIds] = useState<string[]>([])
+  const [createTaskAssigneeIds, setCreateTaskAssigneeIds] = useState<string[]>([])
+  const [editTaskAssigneeIds, setEditTaskAssigneeIds] = useState<string[]>([])
   const [newLabelName, setNewLabelName] = useState('')
   const [newLabelColor, setNewLabelColor] = useState('#7C3AED')
   const notify = useCallback((message: string) => setNotice(message), [])
   const workspace = useWorkspaceData(isLoadingAuth, user?.id, notify)
   const task = useTaskData(workspace.activeProject?.id, notify)
   const label = useLabelData(workspace.activeWorkspaceId, notify)
+  const member = useWorkspaceMembers(workspace.activeWorkspaceId, notify)
 
   useEffect(() => {
     localStorage.setItem('devflow-active-tab', activeTab)
@@ -97,6 +101,14 @@ export default function App() {
     setIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   }
 
+  function openTaskEditor(selectedTask: Task) {
+    setEditingTask(selectedTask)
+    setEditTaskLabelIds(selectedTask.labels.map((label) => label.id))
+    setEditTaskAssigneeIds(
+      selectedTask.assignees.map((assignee) => assignee.id),
+    )
+  }
+
   async function createLabel(target: 'create' | 'edit') {
     try {
       const created = await label.createLabel(newLabelName, newLabelColor)
@@ -125,6 +137,7 @@ export default function App() {
   function closeCreateTaskModal() {
     setTaskModalOpen(false)
     setCreateTaskLabelIds([])
+    setCreateTaskAssigneeIds([])
   }
 
   if (isLoadingAuth) return <div className={`${dark ? 'dark' : ''} grid min-h-screen place-items-center bg-canvas text-ink`}>Checking your session…</div>
@@ -141,9 +154,9 @@ export default function App() {
         <div className="mx-auto max-w-[1200px] px-6 py-5 max-[680px]:px-4">
           <nav className="flex gap-1 overflow-x-auto border-b border-line">{tabs.map(({ label, icon: Icon }) => <button key={label} onClick={() => setActiveTab(label)} className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold ${activeTab === label ? 'border-brand text-brand' : 'border-transparent text-quiet'}`}><Icon size={14} />{label}</button>)}</nav>
           {['Board', 'List', 'Calendar'].includes(activeTab) && <TaskFilterBar search={task.search} status={task.status} priority={task.priority} dueDate={task.dueDate} onSearch={task.setSearch} onStatus={task.setStatus} onPriority={task.setPriority} onDueDate={task.setDueDate} onClear={task.clearFilters} />}
-          {activeTab === 'Board' && <TaskBoard tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onCreate={() => setTaskModalOpen(true)} onStatus={(id, status) => void updateStatus(id, status)} onEdit={(selected) => { setEditingTask(selected); setEditTaskLabelIds(selected.labels.map((item) => item.id)) }} />}
-          {activeTab === 'List' && <TaskList tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onEdit={(selected) => { setEditingTask(selected); setEditTaskLabelIds(selected.labels.map((item) => item.id)) }} />}
-          {activeTab === 'Calendar' && <TaskCalendar tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onEdit={(selected) => { setEditingTask(selected); setEditTaskLabelIds(selected.labels.map((item) => item.id)) }} />}
+          {activeTab === 'Board' && <TaskBoard tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onCreate={() => setTaskModalOpen(true)} onStatus={(id, status) => void updateStatus(id, status)} onEdit={openTaskEditor} />}
+          {activeTab === 'List' && <TaskList tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onEdit={openTaskEditor} />}
+          {activeTab === 'Calendar' && <TaskCalendar tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onEdit={openTaskEditor} />}
           {activeTab === 'Overview' && <Overview tasks={task.tasks} onCreate={() => setTaskModalOpen(true)} />}
         </div>
       </main>
@@ -151,8 +164,8 @@ export default function App() {
     {notice && <div className="fixed bottom-5 right-5 z-40 rounded-lg border border-line bg-panel px-4 py-3 text-sm shadow-xl">{notice}</div>}
     <WorkspaceModal open={workspaceModalOpen} loading={workspace.isCreatingWorkspace} onClose={() => setWorkspaceModalOpen(false)} onSubmit={async (name) => { try { await workspace.createWorkspace(name) } catch (error) { notify(error instanceof Error ? error.message : 'Could not create workspace'); throw error } }} />
     <ProjectModal open={projectModalOpen} loading={workspace.isCreatingProject} onClose={() => setProjectModalOpen(false)} onSubmit={async (name, description) => { try { await workspace.createProject(name, description) } catch (error) { notify(error instanceof Error ? error.message : 'Could not create project'); throw error } }} />
-    <CreateTaskModal open={taskModalOpen} loading={task.isCreatingTask} projectName={workspace.activeProject?.name} labels={label.labels} selectedLabelIds={createTaskLabelIds} onToggleLabel={(id) => toggleLabel(id, setCreateTaskLabelIds)} newLabelName={newLabelName} newLabelColor={newLabelColor} onNewLabelNameChange={setNewLabelName} onNewLabelColorChange={setNewLabelColor} onCreateLabel={() => void createLabel('create')} isCreating={label.isCreating} isLoading={label.isLoading} onClose={closeCreateTaskModal} onSubmit={async (input) => { try { await task.createTask(input); setCreateTaskLabelIds([]) } catch (error) { notify(error instanceof Error ? error.message : 'Could not create task'); throw error } }} />
-    <EditTaskModal task={editingTask} updating={task.isUpdatingTask} deleting={task.isDeletingTask} labels={label.labels} selectedLabelIds={editTaskLabelIds} onToggleLabel={(id) => toggleLabel(id, setEditTaskLabelIds)} newLabelName={newLabelName} newLabelColor={newLabelColor} onNewLabelNameChange={setNewLabelName} onNewLabelColorChange={setNewLabelColor} onCreateLabel={() => void createLabel('edit')} isCreating={label.isCreating} isLoading={label.isLoading} onClose={() => setEditingTask(null)} onUpdate={async (input) => { await updateEditingTask(input); await task.setTaskLabels(editingTask!.id, editTaskLabelIds) }} onDelete={deleteEditingTask} />
+    <CreateTaskModal open={taskModalOpen} loading={task.isCreatingTask} projectName={workspace.activeProject?.name} labels={label.labels} selectedLabelIds={createTaskLabelIds} onToggleLabel={(id) => toggleLabel(id, setCreateTaskLabelIds)} members={member.members} selectedAssigneeIds={createTaskAssigneeIds} onToggleAssignee={(id) => toggleLabel(id, setCreateTaskAssigneeIds)} isLoadingMembers={member.isLoadingMembers} newLabelName={newLabelName} newLabelColor={newLabelColor} onNewLabelNameChange={setNewLabelName} onNewLabelColorChange={setNewLabelColor} onCreateLabel={() => void createLabel('create')} isCreating={label.isCreating} isLoading={label.isLoading} onClose={closeCreateTaskModal} onSubmit={async (input) => { try { await task.createTask(input); setCreateTaskLabelIds([]); setCreateTaskAssigneeIds([]) } catch (error) { notify(error instanceof Error ? error.message : 'Could not create task'); throw error } }} />
+    <EditTaskModal task={editingTask} updating={task.isUpdatingTask} deleting={task.isDeletingTask} labels={label.labels} selectedLabelIds={editTaskLabelIds} onToggleLabel={(id) => toggleLabel(id, setEditTaskLabelIds)} members={member.members} selectedAssigneeIds={editTaskAssigneeIds} onToggleAssignee={(id) => toggleLabel(id, setEditTaskAssigneeIds)} isLoadingMembers={member.isLoadingMembers} newLabelName={newLabelName} newLabelColor={newLabelColor} onNewLabelNameChange={setNewLabelName} onNewLabelColorChange={setNewLabelColor} onCreateLabel={() => void createLabel('edit')} isCreating={label.isCreating} isLoading={label.isLoading} onClose={() => setEditingTask(null)} onUpdate={async (input) => { try { await updateEditingTask(input); await task.setTaskLabels(editingTask!.id, editTaskLabelIds); await task.setTaskAssignees(editingTask!.id, editTaskAssigneeIds) } catch (error) { notify(error instanceof Error ? error.message : 'Could not save task assignees'); throw error } }} onDelete={deleteEditingTask} />
   </div>
 }
 
