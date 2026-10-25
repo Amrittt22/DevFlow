@@ -25,6 +25,11 @@ The foundation is complete and the project is approximately **50% complete** aga
 - Create labels from task forms and assign or remove labels from tasks.
 - Labels displayed in Board, List, and Calendar views.
 - Task-label authorization checks ensure labels belong to the task workspace.
+- Task assignments backed by a many-to-many `TaskAssignee` relationship.
+- Workspace-member API for listing valid task assignees.
+- Assignment validation that prevents assigning users outside the task workspace.
+- Assignee selection in create-task and edit-task forms.
+- Task assignments persist after refresh.
 - Workspace, project, and active-tab persistence after browser refresh.
 - Frontend refactor: separated app types, data hooks, task views, and modal components.
 - Frontend and backend production builds pass after the refactor.
@@ -36,7 +41,7 @@ The foundation is complete and the project is approximately **50% complete** aga
 Sign in
 → Create or select a workspace
 → Create or select a project
-→ Create, label, prioritize, schedule, edit, delete, and complete tasks
+→ Create, label, assign, prioritize, schedule, edit, delete, and complete tasks
 → Collaborate through comments and activity
 → Plan work in sprints and track progress
 ```
@@ -65,11 +70,11 @@ Sign in
 - [x] Allow labels to be assigned and removed from tasks.
 - [x] Improve task loading, empty, error, and confirmation states.
 - [x] Preserve the selected workspace, project, and view after refresh.
+- [x] Add task assignment to workspace members.
 
 ### Remaining
 
 - [ ] Add sorting by status, priority, due date, label, and assignee.
-- [ ] Add task assignment to workspace members.
 - [ ] Improve task-form keyboard and accessibility behavior.
 
 ### Exit check

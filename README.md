@@ -23,6 +23,11 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Reusable workspace labels with custom colors.
 - Create labels directly from create-task and edit-task forms.
 - Assign and remove labels from tasks.
+- Assign one or more workspace members to a task.
+- Assignee selection in create-task and edit-task forms.
+- Protected workspace-member listing for valid task assignees.
+- Backend validation that prevents assignments outside the task workspace.
+- Assignees persist after saving and browser refresh.
 - Label badges in Board and List views, plus label color indicators in Calendar.
 - Selected workspace, project, and Board/List/Calendar tab persist after refresh.
 - Frontend code organized into shared types, hooks, task views, and modal components.
@@ -36,10 +41,10 @@ Sign in
 → Create or select a workspace
 → Create or select a project
 → Create workspace labels
-→ Create tasks and assign labels
+→ Create tasks and assign labels or workspace members
 → View tasks in Board, List, or Calendar
 → Search and filter tasks
-→ Edit, delete, label, or move tasks between statuses
+→ Edit, delete, label, assign, or move tasks between statuses
 ```
 
 ## Project layout
@@ -148,6 +153,8 @@ Open the Vite URL, usually `http://localhost:5173`.
 | `GET` | `/api/v1/workspaces/:workspaceId/labels` | List labels in a workspace. | Bearer token required |
 | `POST` | `/api/v1/workspaces/:workspaceId/labels` | Create a workspace label. | Bearer token required |
 | `PUT` | `/api/v1/tasks/:taskId/labels` | Replace labels assigned to a task. | Bearer token required |
+| `GET` | `/api/v1/workspaces/:workspaceId/members` | List members who can be assigned to workspace tasks. | Bearer token required |
+| `PUT` | `/api/v1/tasks/:taskId/assignees` | Replace users assigned to a task. | Bearer token required |
 
 ## Example request bodies
 
@@ -219,6 +226,19 @@ Set task labels:
 
 A label must belong to the same workspace as the task. A task can have up to 10 labels.
 
+Set task assignees:
+
+```json
+{
+  "userIds": [
+    "user-id-1",
+    "user-id-2"
+  ]
+}
+```
+
+Every assigned user must be a member of the task workspace. A task can have up to 10 assignees.
+
 ## Production builds
 
 Build the frontend:
@@ -237,7 +257,6 @@ npm run build
 
 ## Planned features
 
-- Task assignments
 - Workspace member invitations and roles
 - Task comments and activity history
 - Notifications
