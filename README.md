@@ -25,9 +25,13 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Assign and remove labels from tasks.
 - Assign one or more workspace members to a task.
 - Assignee selection in create-task and edit-task forms.
+- Assignee initials displayed in Board, List, and Calendar views.
 - Protected workspace-member listing for valid task assignees.
 - Backend validation that prevents assignments outside the task workspace.
 - Assignees persist after saving and browser refresh.
+- Workspace invitations for Owners and Admins.
+- Supabase invitation-email delivery with a secure `/invite` acceptance page.
+- Invitation acceptance validates the invite email, pending status, and expiry before adding the user to the workspace.
 - Label badges in Board and List views, plus label color indicators in Calendar.
 - Selected workspace, project, and Board/List/Calendar tab persist after refresh.
 - Frontend code organized into shared types, hooks, task views, and modal components.
@@ -42,6 +46,7 @@ Sign in
 → Create or select a project
 → Create workspace labels
 → Create tasks and assign labels or workspace members
+→ Invite new members to the workspace
 → View tasks in Board, List, or Calendar
 → Search and filter tasks
 → Edit, delete, label, assign, or move tasks between statuses
@@ -55,7 +60,7 @@ DevFlow/
 │   └── src/
 │       ├── app/           # App shell and shared application types
 │       ├── components/    # Task views and reusable modals
-│       ├── features/      # Authentication feature
+│       ├── features/      # Authentication and invitation features
 │       ├── hooks/         # Workspace, task, and label data hooks
 │       ├── lib/           # API and Supabase clients
 │       └── services/      # Authentication and backend services
@@ -96,6 +101,8 @@ Create `backend/.env`:
 DATABASE_URL="paste-your-supabase-session-pooler-connection-string"
 SUPABASE_URL="https://your-project-ref.supabase.co"
 SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
+SUPABASE_SECRET_KEY="your-server-only-supabase-secret-key"
+FRONTEND_URL="http://localhost:5173"
 PORT=4000
 ```
 
@@ -154,6 +161,8 @@ Open the Vite URL, usually `http://localhost:5173`.
 | `POST` | `/api/v1/workspaces/:workspaceId/labels` | Create a workspace label. | Bearer token required |
 | `PUT` | `/api/v1/tasks/:taskId/labels` | Replace labels assigned to a task. | Bearer token required |
 | `GET` | `/api/v1/workspaces/:workspaceId/members` | List members who can be assigned to workspace tasks. | Bearer token required |
+| `POST` | `/api/v1/workspaces/:workspaceId/invites` | Create and send a workspace invitation. | Bearer token required |
+| `POST` | `/api/v1/workspaces/invites/:inviteId/accept` | Accept an invitation and join its workspace. | Bearer token required |
 | `PUT` | `/api/v1/tasks/:taskId/assignees` | Replace users assigned to a task. | Bearer token required |
 
 ## Example request bodies
@@ -239,6 +248,17 @@ Set task assignees:
 
 Every assigned user must be a member of the task workspace. A task can have up to 10 assignees.
 
+Invite a workspace member:
+
+```json
+{
+  "email": "teammate@example.com",
+  "role": "MEMBER"
+}
+```
+
+Valid invitation roles are `ADMIN` and `MEMBER`.
+
 ## Production builds
 
 Build the frontend:
@@ -257,7 +277,7 @@ npm run build
 
 ## Planned features
 
-- Workspace member invitations and roles
+- Workspace invitation management: pending invitations, resend, revoke, and role changes
 - Task comments and activity history
 - Notifications
 - Real-time task, comment, and notification updates
