@@ -10,7 +10,9 @@ import { useLabelData } from '../hooks/useLabelData'
 import { useWorkspaceMembers } from '../hooks/useWorkspaceMembers'
 import type { Task, TaskStatus } from './types'
 import { TaskBoard, TaskCalendar, TaskFilterBar, TaskList } from '../components/tasks/TaskViews'
-import { CreateTaskModal, EditTaskModal, ProjectModal, WorkspaceModal } from '../components/modals/TaskModals'
+import { CreateTaskModal, EditTaskModal, ProjectModal, WorkspaceModal , InviteMemberModal,} from '../components/modals/TaskModals'
+import InvitePage from '../features/invites/InvitePage'
+import { apiRequest } from '../lib/api'
 
 const tabs = [
   { label: 'Overview', icon: LayoutGrid },
@@ -21,6 +23,7 @@ const tabs = [
 
 export default function App() {
   const { user, isLoading: isLoadingAuth } = useAuth()
+  const isInvitePage = window.location.pathname === '/invite'
   const [dark, setDark] = useState(() => localStorage.getItem('devflow-theme') === 'dark')
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('devflow-active-tab')
@@ -45,6 +48,11 @@ export default function App() {
   const task = useTaskData(workspace.activeProject?.id, notify)
   const label = useLabelData(workspace.activeWorkspaceId, notify)
   const member = useWorkspaceMembers(workspace.activeWorkspaceId, notify)
+  const [inviteModalOpen, setInviteModalOpen] = useState(false)
+  const [isInvitingMember, setIsInvitingMember] = useState(false)
+  const canInviteMembers =
+    workspace.activeWorkspace?.role === 'OWNER' ||
+    workspace.activeWorkspace?.role === 'ADMIN'
 
   useEffect(() => {
     localStorage.setItem('devflow-active-tab', activeTab)
@@ -73,6 +81,32 @@ export default function App() {
       notify(`Backend verified: ${backendUser.email ?? backendUser.id}`)
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Backend request failed')
+    }
+  }
+
+  async function inviteWorkspaceMember(
+    email: string,
+    role: 'ADMIN' | 'MEMBER',
+  ) {
+    if (!workspace.activeWorkspaceId) {
+      throw new Error('Select a workspace before sending an invitation.')
+    }
+
+    setIsInvitingMember(true)
+
+    try {
+      const { invite } = await apiRequest<{
+        invite: {
+          email: string
+        }
+      }>(`/api/v1/workspaces/${workspace.activeWorkspaceId}/invites`, {
+        method: 'POST',
+        body: JSON.stringify({ email, role }),
+      })
+
+      notify(`Invitation sent to ${invite.email}`)
+    } finally {
+      setIsInvitingMember(false)
     }
   }
 
@@ -141,7 +175,21 @@ export default function App() {
   }
 
   if (isLoadingAuth) return <div className={`${dark ? 'dark' : ''} grid min-h-screen place-items-center bg-canvas text-ink`}>Checking your session…</div>
-  if (!user) return <div className={`${dark ? 'dark' : ''} min-h-screen`}><AuthPage /></div>
+ if (!user) {
+  return (
+    <div className={`${dark ? 'dark' : ''} min-h-screen`}>
+      <AuthPage />
+    </div>
+  )
+}
+
+if (isInvitePage) {
+  return (
+    <div className={`${dark ? 'dark' : ''} min-h-screen`}>
+      <InvitePage user={user} />
+    </div>
+  )
+}
 
   return <div className={`${dark ? 'dark' : ''} min-h-screen bg-canvas text-ink`}>
     <div className="flex min-h-screen">
@@ -149,7 +197,7 @@ export default function App() {
       <main className="min-w-0 flex-1">
         <header className="flex min-h-[76px] items-center justify-between border-b border-line bg-panel px-6 max-[680px]:px-4">
           <div><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-quiet">Workspace</p><h1 className="font-display text-xl font-bold">{workspace.activeProject?.name ?? workspace.activeWorkspace?.name ?? 'DevFlow'}</h1></div>
-          <div className="flex items-center gap-3"><button onClick={() => void handleBackendCheck()} className="hidden text-xs text-quiet hover:text-ink sm:block">Check backend</button><button onClick={toggleTheme} className="text-quiet" aria-label="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button onClick={() => void handleSignOut()} className="text-quiet" aria-label="Sign out"><LogOut size={17} /></button></div>
+          <div className="flex items-center gap-3">{canInviteMembers && workspace.activeWorkspace && (<button type="button" onClick={() => setInviteModalOpen(true)} className="hidden items-center gap-1.5 rounded-md border border-line px-3 py-2 text-xs font-semibold text-quiet hover:bg-black/[.04] sm:flex dark:hover:bg-white/[.05]"><Users size={15} />Invite member</button>)}<button onClick={() => void handleBackendCheck()} className="hidden text-xs text-quiet hover:text-ink sm:block">Check backend</button><button onClick={toggleTheme} className="text-quiet" aria-label="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button onClick={() => void handleSignOut()} className="text-quiet" aria-label="Sign out"><LogOut size={17} /></button></div>
         </header>
         <div className="mx-auto max-w-[1200px] px-6 py-5 max-[680px]:px-4">
           <nav className="flex gap-1 overflow-x-auto border-b border-line">{tabs.map(({ label, icon: Icon }) => <button key={label} onClick={() => setActiveTab(label)} className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold ${activeTab === label ? 'border-brand text-brand' : 'border-transparent text-quiet'}`}><Icon size={14} />{label}</button>)}</nav>
@@ -166,6 +214,7 @@ export default function App() {
     <ProjectModal open={projectModalOpen} loading={workspace.isCreatingProject} onClose={() => setProjectModalOpen(false)} onSubmit={async (name, description) => { try { await workspace.createProject(name, description) } catch (error) { notify(error instanceof Error ? error.message : 'Could not create project'); throw error } }} />
     <CreateTaskModal open={taskModalOpen} loading={task.isCreatingTask} projectName={workspace.activeProject?.name} labels={label.labels} selectedLabelIds={createTaskLabelIds} onToggleLabel={(id) => toggleLabel(id, setCreateTaskLabelIds)} members={member.members} selectedAssigneeIds={createTaskAssigneeIds} onToggleAssignee={(id) => toggleLabel(id, setCreateTaskAssigneeIds)} isLoadingMembers={member.isLoadingMembers} newLabelName={newLabelName} newLabelColor={newLabelColor} onNewLabelNameChange={setNewLabelName} onNewLabelColorChange={setNewLabelColor} onCreateLabel={() => void createLabel('create')} isCreating={label.isCreating} isLoading={label.isLoading} onClose={closeCreateTaskModal} onSubmit={async (input) => { try { await task.createTask(input); setCreateTaskLabelIds([]); setCreateTaskAssigneeIds([]) } catch (error) { notify(error instanceof Error ? error.message : 'Could not create task'); throw error } }} />
     <EditTaskModal task={editingTask} updating={task.isUpdatingTask} deleting={task.isDeletingTask} labels={label.labels} selectedLabelIds={editTaskLabelIds} onToggleLabel={(id) => toggleLabel(id, setEditTaskLabelIds)} members={member.members} selectedAssigneeIds={editTaskAssigneeIds} onToggleAssignee={(id) => toggleLabel(id, setEditTaskAssigneeIds)} isLoadingMembers={member.isLoadingMembers} newLabelName={newLabelName} newLabelColor={newLabelColor} onNewLabelNameChange={setNewLabelName} onNewLabelColorChange={setNewLabelColor} onCreateLabel={() => void createLabel('edit')} isCreating={label.isCreating} isLoading={label.isLoading} onClose={() => setEditingTask(null)} onUpdate={async (input) => { try { await updateEditingTask(input); await task.setTaskLabels(editingTask!.id, editTaskLabelIds); await task.setTaskAssignees(editingTask!.id, editTaskAssigneeIds) } catch (error) { notify(error instanceof Error ? error.message : 'Could not save task assignees'); throw error } }} onDelete={deleteEditingTask} />
+    <InviteMemberModal open={inviteModalOpen} loading={isInvitingMember} workspaceName={workspace.activeWorkspace?.name} onClose={() => setInviteModalOpen(false)} onSubmit={inviteWorkspaceMember} />
   </div>
 }
 

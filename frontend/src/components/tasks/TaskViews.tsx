@@ -1,6 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { CalendarDays, ChevronRight, CirclePlus, FolderKanban, List, Search, X } from 'lucide-react'
-import type { DueDateFilter, Label, Task, TaskPriority, TaskStatus } from '../../app/types'
+import type {
+  DueDateFilter,
+  Label,
+  Task,
+  TaskAssignee,
+  TaskPriority,
+  TaskStatus,
+} from '../../app/types'
 
 export function LabelBadges({ labels, compact = false }: { labels: Label[]; compact?: boolean }) {
   if (!labels.length) return null
@@ -12,6 +19,68 @@ export function LabelBadges({ labels, compact = false }: { labels: Label[]; comp
 
 type TaskActions = {
   onEdit: (task: Task) => void
+}
+
+export function AssigneeAvatars({
+  assignees,
+  compact = false,
+}: {
+  assignees: TaskAssignee[]
+  compact?: boolean
+}) {
+  if (assignees.length === 0) {
+    return null
+  }
+
+  const visibleAssignees = assignees.slice(0, compact ? 2 : 3)
+  const remainingCount = assignees.length - visibleAssignees.length
+
+  return (
+    <div
+      className={`mt-2 flex items-center ${
+        compact ? 'gap-0.5' : 'gap-1'
+      }`}
+      aria-label={`Assigned to ${assignees
+        .map((assignee) => assignee.displayName || assignee.email)
+        .join(', ')}`}
+    >
+      {visibleAssignees.map((assignee) => {
+        const name = assignee.displayName?.trim() || assignee.email
+
+        const initials = name
+          .split(/[\s@._-]+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0]?.toUpperCase())
+          .join('')
+
+        return (
+          <span
+            key={assignee.id}
+            title={name}
+            className={`grid shrink-0 place-items-center rounded-full border-2 border-panel bg-brand font-bold text-white ${
+              compact ? 'h-4 w-4 text-[7px]' : 'h-6 w-6 text-[9px]'
+            }`}
+          >
+            {initials || '?'}
+          </span>
+        )
+      })}
+
+      {remainingCount > 0 && (
+        <span
+          className={`grid place-items-center rounded-full bg-black/[.06] font-semibold text-quiet dark:bg-white/[.1] ${
+            compact ? 'h-4 w-4 text-[7px]' : 'h-6 w-6 text-[9px]'
+          }`}
+          title={`${remainingCount} more assignee${
+            remainingCount === 1 ? '' : 's'
+          }`}
+        >
+          +{remainingCount}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function TaskBoard({ tasks, loading, hasProject, onCreate, onStatus, onEdit }: {
@@ -47,7 +116,7 @@ export function TaskBoard({ tasks, loading, hasProject, onCreate, onStatus, onEd
         return <section key={status} onDragOver={(event) => { event.preventDefault(); setTarget(status) }} onDragLeave={() => setTarget(null)} onDrop={(event) => { event.preventDefault(); const task = tasks.find((item) => item.id === dragged); if (task && task.status !== status) onStatus(task.id, status); setDragged(null); setTarget(null) }} className={`min-h-[260px] rounded-xl border p-3 ${target === status ? 'border-brand bg-brand-soft' : 'border-line bg-black/[.015] dark:bg-white/[.02]'}`}>
           <div className="mb-3 flex items-center justify-between px-1"><h3 className="flex items-center gap-2 text-xs font-semibold"><i className={`h-2 w-2 rounded-full ${dot}`} />{label}</h3><span className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-quiet">{columnTasks.length}</span></div>
           <div className="space-y-2">{columnTasks.map((task) => <article key={task.id} draggable onDragStart={() => setDragged(task.id)} onDragEnd={() => { setDragged(null); setTarget(null) }} className={`cursor-grab rounded-lg border border-line bg-panel p-3 shadow-soft ${dragged === task.id ? 'opacity-50' : ''}`}>
-            <button type="button" onClick={() => onEdit(task)} className="w-full text-left"><h4 className="text-xs font-semibold">{task.title}</h4>{task.description && <p className="mt-1.5 line-clamp-2 text-[11px] text-quiet">{task.description}</p>}<span className={`mt-3 inline-flex rounded px-1.5 py-0.5 text-[9px] font-semibold ${priority[task.priority]}`}>{task.priority.toLowerCase()} priority</span><LabelBadges labels={task.labels} /></button>
+            <button type="button" onClick={() => onEdit(task)} className="w-full text-left"><h4 className="text-xs font-semibold">{task.title}</h4>{task.description && <p className="mt-1.5 line-clamp-2 text-[11px] text-quiet">{task.description}</p>}<span className={`mt-3 inline-flex rounded px-1.5 py-0.5 text-[9px] font-semibold ${priority[task.priority]}`}>{task.priority.toLowerCase()} priority</span><LabelBadges labels={task.labels} /><AssigneeAvatars assignees={task.assignees} /></button>
             <select value={task.status} onChange={(event) => onStatus(task.id, event.target.value as TaskStatus)} className="mt-3 h-7 w-full rounded border border-line bg-canvas px-1.5 text-[10px] text-ink outline-none" aria-label={`Change status for ${task.title}`}><option value="TODO">Todo</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select>
           </article>)}{!columnTasks.length && <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[10px] text-quiet">No tasks</p>}</div>
         </section>
@@ -60,7 +129,7 @@ export function TaskList({ tasks, loading, hasProject, onEdit }: { tasks: Task[]
   if (!hasProject) return <EmptyState icon={<List />} title="Select a project" text="Create or select a project to view its tasks." />
   if (loading) return <LoadingState />
   const status: Record<TaskStatus, string> = { TODO: 'bg-slate-100 text-slate-700', IN_PROGRESS: 'bg-amber-50 text-amber-700', DONE: 'bg-emerald-50 text-emerald-700' }
-  return <section className="pt-7"><h2 className="font-display text-[17px] font-bold">Task list</h2><p className="mt-1 text-[11px] text-quiet">View and edit every task in this project.</p>{tasks.length ? <div className="mt-5 overflow-x-auto rounded-xl border border-line bg-panel"><table className="w-full min-w-[700px] border-collapse text-left text-xs"><thead className="border-b border-line text-[10px] uppercase tracking-wide text-quiet"><tr>{['Task', 'Status', 'Priority', 'Due date', 'Action'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody>{tasks.map((task) => <tr key={task.id} className="border-b border-line last:border-0">  <td className="max-w-[320px] px-4 py-3"><strong className="block truncate">{task.title}</strong>{task.description && <span className="mt-1 block truncate text-[10px] text-quiet">{task.description}</span>}<LabelBadges labels={task.labels} /></td><td className="px-4 py-3"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${status[task.status]}`}>{task.status.replace('_', ' ').toLowerCase()}</span></td><td className="px-4 py-3 text-[10px]">{task.priority.toLowerCase()}</td><td className="px-4 py-3 text-[11px] text-quiet">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</td><td className="px-4 py-3 text-right"><button onClick={() => onEdit(task)} className="rounded-md border border-line px-2.5 py-1.5 text-[10px] font-semibold text-quiet">Edit</button></td></tr>)}</tbody></table></div> : <p className="mt-5 rounded-xl border border-dashed border-line p-12 text-center text-sm text-quiet">No tasks yet</p>}</section>
+  return <section className="pt-7"><h2 className="font-display text-[17px] font-bold">Task list</h2><p className="mt-1 text-[11px] text-quiet">View and edit every task in this project.</p>{tasks.length ? <div className="mt-5 overflow-x-auto rounded-xl border border-line bg-panel"><table className="w-full min-w-[700px] border-collapse text-left text-xs"><thead className="border-b border-line text-[10px] uppercase tracking-wide text-quiet"><tr>{['Task', 'Status', 'Priority', 'Due date', 'Action'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody>{tasks.map((task) => <tr key={task.id} className="border-b border-line last:border-0">  <td className="max-w-[320px] px-4 py-3"><strong className="block truncate">{task.title}</strong>{task.description && <span className="mt-1 block truncate text-[10px] text-quiet">{task.description}</span>}<LabelBadges labels={task.labels} /><AssigneeAvatars assignees={task.assignees} /></td><td className="px-4 py-3"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${status[task.status]}`}>{task.status.replace('_', ' ').toLowerCase()}</span></td><td className="px-4 py-3 text-[10px]">{task.priority.toLowerCase()}</td><td className="px-4 py-3 text-[11px] text-quiet">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</td><td className="px-4 py-3 text-right"><button onClick={() => onEdit(task)} className="rounded-md border border-line px-2.5 py-1.5 text-[10px] font-semibold text-quiet">Edit</button></td></tr>)}</tbody></table></div> : <p className="mt-5 rounded-xl border border-dashed border-line p-12 text-center text-sm text-quiet">No tasks yet</p>}</section>
 }
 
 export function TaskCalendar({ tasks, loading, hasProject, onEdit }: { tasks: Task[]; loading: boolean; hasProject: boolean; onEdit: TaskActions['onEdit'] }) {
@@ -70,7 +139,7 @@ export function TaskCalendar({ tasks, loading, hasProject, onEdit }: { tasks: Ta
   const year = month.getFullYear(); const monthIndex = month.getMonth(); const first = new Date(year, monthIndex, 1).getDay(); const days = new Date(year, monthIndex + 1, 0).getDate()
   const cells = Array.from({ length: Math.ceil((first + days) / 7) * 7 }, (_, index) => index - first + 1)
   const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
-  return <section className="pt-7"><header className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-[17px] font-bold">Calendar</h2><p className="mt-1 text-[11px] text-quiet">Tasks appear on their due date.</p></div><div className="flex items-center gap-2"><button onClick={() => setMonth(new Date(year, monthIndex - 1, 1))} className="grid h-8 w-8 place-items-center rounded-md border border-line"><ChevronRight size={16} className="rotate-180" /></button><strong className="min-w-32 text-center text-xs">{month.toLocaleString('default', { month: 'long', year: 'numeric' })}</strong><button onClick={() => setMonth(new Date(year, monthIndex + 1, 1))} className="grid h-8 w-8 place-items-center rounded-md border border-line"><ChevronRight size={16} /></button></div></header><div className="overflow-x-auto rounded-xl border border-line bg-panel"><div className="min-w-[720px]"><div className="grid grid-cols-7 border-b border-line text-center text-[10px] font-semibold uppercase text-quiet">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day} className="px-3 py-2">{day}</div>)}</div><div className="grid grid-cols-7">{cells.map((day, index) => { if (day < 1 || day > days) return <div key={index} className="min-h-28 border-b border-r border-line bg-black/[.01]" />; const date = new Date(year, monthIndex, day); const dayTasks = tasks.filter((task) => task.dueDate && sameDay(new Date(task.dueDate), date)); return <div key={day} className="min-h-28 border-b border-r border-line p-2"><span className="text-[10px] text-quiet">{day}</span><div className="mt-1.5 space-y-1">{dayTasks.slice(0, 3).map((task) => <button key={task.id} onClick={() => onEdit(task)} className="block w-full truncate rounded bg-brand-soft px-1.5 py-1 text-left text-[9px] text-brand">{task.title}<LabelBadges labels={task.labels} compact /></button>)}</div></div> })}</div></div></div></section>
+  return <section className="pt-7"><header className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-[17px] font-bold">Calendar</h2><p className="mt-1 text-[11px] text-quiet">Tasks appear on their due date.</p></div><div className="flex items-center gap-2"><button onClick={() => setMonth(new Date(year, monthIndex - 1, 1))} className="grid h-8 w-8 place-items-center rounded-md border border-line"><ChevronRight size={16} className="rotate-180" /></button><strong className="min-w-32 text-center text-xs">{month.toLocaleString('default', { month: 'long', year: 'numeric' })}</strong><button onClick={() => setMonth(new Date(year, monthIndex + 1, 1))} className="grid h-8 w-8 place-items-center rounded-md border border-line"><ChevronRight size={16} /></button></div></header><div className="overflow-x-auto rounded-xl border border-line bg-panel"><div className="min-w-[720px]"><div className="grid grid-cols-7 border-b border-line text-center text-[10px] font-semibold uppercase text-quiet">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day} className="px-3 py-2">{day}</div>)}</div><div className="grid grid-cols-7">{cells.map((day, index) => { if (day < 1 || day > days) return <div key={index} className="min-h-28 border-b border-r border-line bg-black/[.01]" />; const date = new Date(year, monthIndex, day); const dayTasks = tasks.filter((task) => task.dueDate && sameDay(new Date(task.dueDate), date)); return <div key={day} className="min-h-28 border-b border-r border-line p-2"><span className="text-[10px] text-quiet">{day}</span><div className="mt-1.5 space-y-1">{dayTasks.slice(0, 3).map((task) => <button key={task.id} onClick={() => onEdit(task)} className="block w-full truncate rounded bg-brand-soft px-1.5 py-1 text-left text-[9px] text-brand">{task.title}<AssigneeAvatars assignees={task.assignees} compact /></button>)}</div></div> })}</div></div></div></section>
 }
 
 export function TaskFilterBar({ search, status, priority, dueDate, onSearch, onStatus, onPriority, onDueDate, onClear }: { search: string; status: TaskStatus | 'ALL'; priority: TaskPriority | 'ALL'; dueDate: DueDateFilter; onSearch: (value: string) => void; onStatus: (value: TaskStatus | 'ALL') => void; onPriority: (value: TaskPriority | 'ALL') => void; onDueDate: (value: DueDateFilter) => void; onClear: () => void }) {

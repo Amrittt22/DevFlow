@@ -15,6 +15,13 @@ enum WorkspaceRole {
   MEMBER
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -34,16 +41,18 @@ model User {
   createdAt       DateTime          @default(now())
   memberships     WorkspaceMember[]
   taskAssignments TaskAssignee[]
+  sentInvitations WorkspaceInvite[] @relation("InvitationSender")
 }
 
 model Workspace {
-  id        String            @id @default(cuid())
-  name      String
-  slug      String            @unique
-  createdAt DateTime          @default(now())
-  members   WorkspaceMember[]
-  projects  Project[]
-  labels    Label[]
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  createdAt   DateTime          @default(now())
+  members     WorkspaceMember[]
+  projects    Project[]
+  labels      Label[]
+  invitations WorkspaceInvite[]
 }
 
 model WorkspaceMember {
@@ -130,4 +139,23 @@ model TaskAssignee {
 
   @@id([taskId, userId])
   @@index([userId])
+}
+
+model WorkspaceInvite {
+  id          String           @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole    @default(MEMBER)
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
+  @@index([email, status])
+  @@index([workspaceId, status])
 }

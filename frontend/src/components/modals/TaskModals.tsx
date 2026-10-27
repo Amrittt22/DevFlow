@@ -39,6 +39,100 @@ type LabelPickerProps = {
   isLoading: boolean
 }
 
+export function InviteMemberModal({
+  open,
+  loading,
+  workspaceName,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean
+  loading: boolean
+  workspaceName?: string
+  onClose: () => void
+  onSubmit: (email: string, role: 'ADMIN' | 'MEMBER') => Promise<void>
+}) {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'ADMIN' | 'MEMBER'>('MEMBER')
+  const [error, setError] = useState('')
+
+  if (!open) return null
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+
+    try {
+      await onSubmit(email, role)
+      setEmail('')
+      setRole('MEMBER')
+      onClose()
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Could not send invitation.',
+      )
+    }
+  }
+
+  return (
+    <Modal>
+      <form
+        onSubmit={(event) => void handleSubmit(event)}
+        className="w-full max-w-md rounded-xl border border-line bg-panel p-5 shadow-xl"
+      >
+        <Header
+          title="Invite workspace member"
+          subtitle={`Invite someone to ${workspaceName ?? 'this workspace'}.`}
+          onClose={onClose}
+        />
+
+        <label className="mt-5 block text-sm font-medium">
+          Email address
+          <input
+            type="email"
+            autoFocus
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="teammate@example.com"
+            className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm outline-none focus:border-brand"
+          />
+        </label>
+
+        <label className="mt-4 block text-sm font-medium">
+          Workspace role
+          <select
+            value={role}
+            onChange={(event) =>
+              setRole(event.target.value as 'ADMIN' | 'MEMBER')
+            }
+            className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm outline-none focus:border-brand"
+          >
+            <option value="MEMBER">Member</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </label>
+
+        <p className="mt-3 text-xs text-quiet">
+          Members can work on tasks. Admins can also invite members.
+        </p>
+
+        {error && (
+          <p className="mt-3 text-sm text-rose-600" role="alert">
+            {error}
+          </p>
+        )}
+
+        <Actions
+          loading={loading}
+          label="Send invitation"
+          onCancel={onClose}
+        />
+      </form>
+    </Modal>
+  )
+}
+
 export function LabelPicker({ labels, selectedLabelIds, onToggle, newLabelName, newLabelColor, onNewLabelNameChange, onNewLabelColorChange, onCreateLabel, isCreating, isLoading }: LabelPickerProps) {
   return <section className="mt-4 space-y-2"><div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wide text-quiet">Labels</p><span className="text-xs text-quiet">{selectedLabelIds.length} selected</span></div><div className="flex flex-wrap gap-2">{isLoading ? <span className="text-sm text-quiet">Loading labels…</span> : labels.length === 0 ? <span className="text-sm text-quiet">Create your first label below.</span> : labels.map((label) => { const selected = selectedLabelIds.includes(label.id); return <button key={label.id} type="button" onClick={() => onToggle(label.id)} className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${selected ? 'bg-black/[.05] dark:bg-white/[.1]' : 'border-transparent bg-black/[.03] dark:bg-white/[.05]'}`} style={{ borderColor: selected ? label.color : undefined, color: label.color }}><span className="h-2 w-2 rounded-full" style={{ backgroundColor: label.color }} />{label.name}</button> })}</div><div className="flex items-center gap-2"><input value={newLabelName} onChange={(event) => onNewLabelNameChange(event.target.value)} placeholder="New label" maxLength={40} className="min-w-0 flex-1 rounded-md border border-line bg-transparent px-3 py-2 text-sm outline-none focus:border-brand" /><input type="color" value={newLabelColor} onChange={(event) => onNewLabelColorChange(event.target.value)} aria-label="Label color" className="h-9 w-10 cursor-pointer rounded border border-line bg-transparent p-1" /><button type="button" onClick={onCreateLabel} disabled={isCreating || newLabelName.trim().length < 2} className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{isCreating ? 'Adding…' : 'Add'}</button></div></section>
 }

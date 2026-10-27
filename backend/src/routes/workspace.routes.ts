@@ -6,6 +6,17 @@ import {
   listWorkspaceMembers,
 } from '../modules/workspaces/workspace.service.js'
 import { createWorkspaceSchema } from '../modules/workspaces/workspace.schemas.js'
+import { createWorkspaceInviteSchema } from '../modules/workspaces/workspace-invite.schemas.js'
+import {
+  acceptWorkspaceInvite,
+  createWorkspaceInvite,
+  sendWorkspaceInviteEmail,
+  WorkspaceInviteAlreadyMemberError,
+  WorkspaceInviteAcceptanceError,
+  WorkspaceInviteEmailError,
+  WorkspaceInviteNotFoundError,
+  WorkspaceInvitePermissionError,
+} from '../modules/workspaces/workspace-invite.service.js'
 
 const workspaceRouter = Router()
 
@@ -80,6 +91,104 @@ workspaceRouter.get(
       console.error('Workspace member listing failed:', error)
       response.status(500).json({
         error: 'Unable to load workspace members',
+      })
+    }
+  },
+)
+
+workspaceRouter.post(
+  '/:workspaceId/invites',
+  requireAuth,
+  async (request, response) => {
+    const workspaceId = request.params.workspaceId
+
+    if (typeof workspaceId !== 'string') {
+      response.status(400).json({
+        error: 'A valid workspace ID is required',
+      })
+      return
+    }
+
+    const result = createWorkspaceInviteSchema.safeParse(request.body)
+
+    if (!result.success) {
+      response.status(400).json({
+        error: 'Invalid invitation data',
+        details: result.error.flatten().fieldErrors,
+      })
+      return
+    }
+
+    try {
+      const invite = await createWorkspaceInvite(
+        workspaceId,
+        response.locals.authUser.id,
+        result.data,
+      )
+
+      await sendWorkspaceInviteEmail(invite)
+
+      response.status(201).json({ invite })
+    } catch (error) {
+      if (error instanceof WorkspaceInvitePermissionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceInviteAlreadyMemberError) {
+        response.status(400).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceInviteEmailError) {
+        response.status(502).json({
+          error: `Invitation was saved, but the email could not be sent: ${error.message}`,
+        })
+        return
+      }
+
+      console.error('Workspace invitation creation failed:', error)
+      response.status(500).json({
+        error: 'Unable to create workspace invitation',
+      })
+    }
+  },
+)
+
+workspaceRouter.post(
+  '/invites/:inviteId/accept',
+  requireAuth,
+  async (request, response) => {
+    const inviteId = request.params.inviteId
+
+    if (typeof inviteId !== 'string') {
+      response.status(400).json({
+        error: 'A valid invitation ID is required',
+      })
+      return
+    }
+
+    try {
+      const workspace = await acceptWorkspaceInvite(
+        inviteId,
+        response.locals.authUser,
+      )
+
+      response.status(200).json({ workspace })
+    } catch (error) {
+      if (error instanceof WorkspaceInviteNotFoundError) {
+        response.status(404).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceInviteAcceptanceError) {
+        response.status(400).json({ error: error.message })
+        return
+      }
+
+      console.error('Workspace invitation acceptance failed:', error)
+      response.status(500).json({
+        error: 'Unable to accept workspace invitation',
       })
     }
   },
