@@ -10,7 +10,7 @@ The foundation is complete and the project is approximately **55% complete** aga
 
 ### Completed
 
-- Supabase email authentication and protected frontend routes.
+- Supabase email authentication, password recovery, and protected frontend routes.
 - Express API with server-side Supabase token verification.
 - PostgreSQL database with Prisma migrations.
 - Workspace creation and workspace membership checks.
@@ -34,6 +34,7 @@ The foundation is complete and the project is approximately **55% complete** aga
 - Workspace invitation model with expiry, roles, sender, status, and acceptance tracking.
 - Owner/Admin permission checks for invitation creation.
 - Supabase invitation-email delivery and secure invitation acceptance flow.
+- Invitation listing, resend, revoke, and copyable links for existing Supabase users.
 - Workspace, project, and active-tab persistence after browser refresh.
 - Frontend refactor: separated app types, data hooks, task views, and modal components.
 - Frontend and backend production builds pass after the refactor.
@@ -96,13 +97,14 @@ A team can create, find, assign, prioritize, schedule, edit, delete, and complet
 - [x] Send Supabase invitation emails.
 - [x] Add a frontend invitation-acceptance page.
 - [x] Add invited users to the correct workspace after acceptance.
+- [x] Add invitation listing, resend, revoke, and copyable links for existing users.
 
 ### Remaining
 
-- [ ] Test the complete email invitation flow with a second account.
+- [x] Test the complete email invitation flow with a second account.
 - [ ] Show workspace members in a dedicated management screen.
-- [ ] List pending invitations.
-- [ ] Resend, revoke, and manage invitations.
+- [x] List pending invitations.
+- [x] Resend, revoke, and manage invitations.
 - [ ] Allow role changes for existing workspace members.
 - Add project membership where it improves access control.
 - Add task comments.

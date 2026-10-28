@@ -1,8 +1,13 @@
 import { useState, type FormEvent } from 'react'
-import { signIn, signUp } from '../../services/auth.service'
+import {
+  requestPasswordReset,
+  signIn,
+  signUp,
+} from '../../services/auth.service'
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false)
+  const [isResetRequest, setIsResetRequest] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
@@ -13,9 +18,11 @@ export default function AuthPage() {
     setMessage('')
     setIsLoading(true)
 
-    const { error } = isSignUp
-      ? await signUp(email, password)
-      : await signIn(email, password)
+    const { error } = isResetRequest
+      ? await requestPasswordReset(email)
+      : isSignUp
+        ? await signUp(email, password)
+        : await signIn(email, password)
 
     setIsLoading(false)
 
@@ -24,23 +31,33 @@ export default function AuthPage() {
       return
     }
 
-    setMessage(
-      isSignUp
-        ? 'Account created. Check your email to confirm your address.'
-        : 'Signed in successfully.',
-    )
+    if (isResetRequest) {
+      setMessage('Check your email for a password reset link.')
+    } else {
+      setMessage(
+        isSignUp
+          ? 'Account created. Check your email to confirm your address.'
+          : 'Signed in successfully.',
+      )
+    }
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 dark:bg-slate-950">
       <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-slate-900">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-          {isSignUp ? 'Create your account' : 'Welcome back'}
+          {isResetRequest
+            ? 'Reset your password'
+            : isSignUp
+              ? 'Create your account'
+              : 'Welcome back'}
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          {isSignUp
-            ? 'Sign up to start using DevFlow.'
-            : 'Sign in to continue to DevFlow.'}
+          {isResetRequest
+            ? 'Enter your email and we will send you a secure reset link.'
+            : isSignUp
+              ? 'Sign up to start using DevFlow.'
+              : 'Sign in to continue to DevFlow.'}
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -58,20 +75,22 @@ export default function AuthPage() {
             />
           </label>
 
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Password
-            </span>
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              type="password"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              minLength={8}
-              required
-            />
-          </label>
+          {!isResetRequest && (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Password
+              </span>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                type="password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                minLength={8}
+                required
+              />
+            </label>
+          )}
 
           {message && (
             <p className="text-sm text-slate-700 dark:text-slate-300" role="status">
@@ -84,22 +103,44 @@ export default function AuthPage() {
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+            {isLoading
+              ? 'Please wait…'
+              : isResetRequest
+                ? 'Send reset link'
+                : isSignUp
+                  ? 'Create account'
+                  : 'Sign in'}
           </button>
         </form>
 
-        <button
-          className="mt-5 text-sm font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400"
-          type="button"
-          onClick={() => {
-            setIsSignUp(!isSignUp)
-            setMessage('')
-          }}
-        >
-          {isSignUp
-            ? 'Already have an account? Sign in'
-            : 'New to DevFlow? Create an account'}
-        </button>
+        <div className="mt-5 flex flex-col gap-3 text-sm font-medium text-orange-600 dark:text-orange-400">
+          {!isResetRequest && (
+            <button
+              className="hover:text-orange-700"
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp)
+                setMessage('')
+              }}
+            >
+              {isSignUp
+                ? 'Already have an account? Sign in'
+                : 'New to DevFlow? Create an account'}
+            </button>
+          )}
+          <button
+            className="hover:text-orange-700"
+            type="button"
+            onClick={() => {
+              setIsResetRequest(!isResetRequest)
+              setIsSignUp(false)
+              setPassword('')
+              setMessage('')
+            }}
+          >
+            {isResetRequest ? 'Back to sign in' : 'Forgot password?'}
+          </button>
+        </div>
       </section>
     </main>
   )

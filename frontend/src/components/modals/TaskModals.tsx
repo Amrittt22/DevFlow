@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import type { Label, Task, TaskPriority, TaskStatus , WorkspaceMember} from '../../app/types'
+import type { WorkspaceInvite } from '../../hooks/useWorkspaceInvites'
 
 function Modal({ children }: { children: ReactNode }) {
   return <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4">{children}</div>
@@ -129,6 +130,221 @@ export function InviteMemberModal({
           onCancel={onClose}
         />
       </form>
+    </Modal>
+  )
+}
+
+export function InvitationLinkModal({
+  open,
+  email,
+  inviteUrl,
+  onClose,
+}: {
+  open: boolean
+  email: string
+  inviteUrl: string
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+
+  if (!open) return null
+
+  async function copyInviteLink() {
+    setError('')
+
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+    } catch {
+      setError('Could not copy the link. Select it and copy it manually.')
+    }
+  }
+
+  return (
+    <Modal>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invitation-link-title"
+        className="w-full max-w-lg rounded-xl border border-line bg-panel p-5 shadow-xl"
+      >
+        <Header
+          title="Share invitation link"
+          subtitle={`Send this link to ${email}.`}
+          onClose={onClose}
+        />
+
+        <label className="mt-5 block text-sm font-medium">
+          Invitation link
+          <input
+            readOnly
+            value={inviteUrl}
+            onFocus={(event) => event.currentTarget.select()}
+            className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-xs text-quiet outline-none focus:border-brand"
+          />
+        </label>
+
+        {error && (
+          <p className="mt-3 text-sm text-rose-600" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-line px-3 py-2 text-sm text-quiet"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={() => void copyInviteLink()}
+            className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white"
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+        </div>
+      </section>
+    </Modal>
+  )
+}
+
+export function WorkspaceInvitesModal({
+  open,
+  loading,
+  workspaceName,
+  invites,
+  onClose,
+  actionInviteId,
+  onRevoke,
+  onResend,
+}: {
+  open: boolean
+  loading: boolean
+  workspaceName?: string
+  invites: WorkspaceInvite[]
+  onClose: () => void
+  actionInviteId: string | null
+  onRevoke: (inviteId: string) => Promise<void>
+  onResend: (invite: WorkspaceInvite) => Promise<void>
+}) {
+  if (!open) return null
+
+  return (
+    <Modal>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workspace-invitations-title"
+        className="w-full max-w-2xl rounded-xl border border-line bg-panel p-5 shadow-xl"
+      >
+        <Header
+          title="Workspace invitations"
+          subtitle={`Invitation history for ${workspaceName ?? 'this workspace'}.`}
+          onClose={onClose}
+        />
+
+        <div className="mt-5 max-h-[60vh] overflow-y-auto rounded-lg border border-line">
+          {loading ? (
+            <p className="p-5 text-sm text-quiet">
+              Loading invitations…
+            </p>
+          ) : invites.length === 0 ? (
+            <div className="p-5">
+              <p className="text-sm font-medium">No invitations yet</p>
+              <p className="mt-1 text-sm text-quiet">
+                Invite a teammate to start collaborating.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-line">
+              {invites.map((invite) => {
+                const statusClasses = {
+                  PENDING: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                  ACCEPTED: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+                  REVOKED: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
+                  EXPIRED: 'bg-black/[.05] text-quiet dark:bg-white/[.08]',
+                }[invite.status]
+
+                const formattedDate = new Intl.DateTimeFormat(undefined, {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                }).format(new Date(invite.createdAt))
+                const isActionPending =
+                  actionInviteId === invite.id ||
+                  actionInviteId === invite.email
+                const canResend = invite.status !== 'ACCEPTED'
+                const canRevoke = invite.status === 'PENDING'
+
+                return (
+                  <li
+                    key={invite.id}
+                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {invite.email}
+                      </p>
+                      <p className="mt-1 text-xs text-quiet">
+                        Invited as {invite.role.toLowerCase()} · {formattedDate}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusClasses}`}
+                      >
+                        {invite.status.toLowerCase()}
+                      </span>
+                      {canResend && (
+                        <button
+                          type="button"
+                          disabled={isActionPending}
+                          onClick={() => void onResend(invite)}
+                          className="rounded-md border border-line px-2.5 py-1.5 text-[11px] font-semibold text-quiet disabled:opacity-50"
+                        >
+                          {isActionPending ? 'Sending…' : 'Resend'}
+                        </button>
+                      )}
+                      {canRevoke && (
+                        <button
+                          type="button"
+                          disabled={isActionPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Revoke the invitation for ${invite.email}?`,
+                              )
+                            ) {
+                              void onRevoke(invite.id)
+                            }
+                          }}
+                          className="rounded-md border border-rose-200 px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 disabled:opacity-50 dark:border-rose-900/50 dark:text-rose-300"
+                        >
+                          {isActionPending ? 'Working…' : 'Revoke'}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-line px-3 py-2 text-sm text-quiet"
+          >
+            Close
+          </button>
+        </div>
+      </section>
     </Modal>
   )
 }

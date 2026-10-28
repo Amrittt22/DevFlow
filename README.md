@@ -7,6 +7,7 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Responsive React dashboard built with TypeScript and Tailwind CSS.
 - Light and dark themes.
 - Supabase email sign-up, sign-in, session tracking, and sign-out.
+- Supabase password recovery with a secure `/reset-password` page.
 - Express API with server-side Supabase token verification.
 - PostgreSQL database hosted on Supabase and accessed through Prisma.
 - Protected workspace creation and workspace listing.
@@ -32,6 +33,7 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Workspace invitations for Owners and Admins.
 - Supabase invitation-email delivery with a secure `/invite` acceptance page.
 - Invitation acceptance validates the invite email, pending status, and expiry before adding the user to the workspace.
+- Invitation management with pending-invitation listing, resend, revoke, and copyable links for existing Supabase users.
 - Label badges in Board and List views, plus label color indicators in Calendar.
 - Selected workspace, project, and Board/List/Calendar tab persist after refresh.
 - Frontend code organized into shared types, hooks, task views, and modal components.
@@ -42,6 +44,7 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 
 ```text
 Sign in
+→ Recover a forgotten password when needed
 → Create or select a workspace
 → Create or select a project
 → Create workspace labels
@@ -92,6 +95,9 @@ DevFlow/
 6. Open your database connection settings and copy the Session Pooler connection string.
 
 For local testing, email confirmation can be enabled or disabled in the Supabase Email provider settings.
+
+Password recovery redirects to `http://localhost:5173/reset-password`, and invitation links use
+`http://localhost:5173/invite`. Both routes must remain allowed in Supabase Redirect URLs.
 
 ## Environment variables
 

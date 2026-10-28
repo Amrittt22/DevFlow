@@ -16,6 +16,9 @@ import {
   WorkspaceInviteEmailError,
   WorkspaceInviteNotFoundError,
   WorkspaceInvitePermissionError,
+  listWorkspaceInvites,
+  revokeWorkspaceInvite,
+  WorkspaceInviteRevocationError,
 } from '../modules/workspaces/workspace-invite.service.js'
 
 const workspaceRouter = Router()
@@ -96,6 +99,85 @@ workspaceRouter.get(
   },
 )
 
+workspaceRouter.get(
+  '/:workspaceId/invites',
+  requireAuth,
+  async (request, response) => {
+    const workspaceId = request.params.workspaceId
+
+    if (typeof workspaceId !== 'string') {
+      response.status(400).json({
+        error: 'A valid workspace ID is required',
+      })
+      return
+    }
+
+    try {
+      const invites = await listWorkspaceInvites(
+        workspaceId,
+        response.locals.authUser.id,
+      )
+
+      response.status(200).json({ invites })
+    } catch (error) {
+      if (error instanceof WorkspaceInvitePermissionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      console.error('Workspace invitation listing failed:', error)
+      response.status(500).json({
+        error: 'Unable to load workspace invitations',
+      })
+    }
+  },
+)
+
+workspaceRouter.delete(
+  '/:workspaceId/invites/:inviteId',
+  requireAuth,
+  async (request, response) => {
+    const { workspaceId, inviteId } = request.params
+
+    if (typeof workspaceId !== 'string' || typeof inviteId !== 'string') {
+      response.status(400).json({
+        error: 'A valid workspace ID and invitation ID are required',
+      })
+      return
+    }
+
+    try {
+      const invite = await revokeWorkspaceInvite(
+        workspaceId,
+        inviteId,
+        response.locals.authUser.id,
+      )
+
+      response.status(200).json({ invite })
+    } catch (error) {
+      if (error instanceof WorkspaceInvitePermissionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceInviteNotFoundError) {
+        response.status(404).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceInviteRevocationError) {
+        response.status(400).json({ error: error.message })
+        return
+      }
+
+      console.error('Workspace invitation revocation failed:', error)
+      response.status(500).json({
+        error: 'Unable to revoke workspace invitation',
+      })
+    }
+  },
+)
+
 workspaceRouter.post(
   '/:workspaceId/invites',
   requireAuth,
@@ -126,9 +208,9 @@ workspaceRouter.post(
         result.data,
       )
 
-      await sendWorkspaceInviteEmail(invite)
+      const delivery = await sendWorkspaceInviteEmail(invite)
 
-      response.status(201).json({ invite })
+      response.status(201).json({ invite, ...delivery })
     } catch (error) {
       if (error instanceof WorkspaceInvitePermissionError) {
         response.status(403).json({ error: error.message })

@@ -9,9 +9,19 @@ export default function InvitePage({ user }: { user: User }) {
   const [isAccepting, setIsAccepting] = useState(false)
 
   const inviteId =
-    typeof user.user_metadata?.devflowInviteId === 'string'
+    new URLSearchParams(window.location.search).get('inviteId') ??
+    (typeof user.user_metadata?.devflowInviteId === 'string'
       ? user.user_metadata.devflowInviteId
-      : null
+      : null)
+  const invitedEmail =
+    new URLSearchParams(window.location.search).get('inviteEmail') ??
+    (typeof user.user_metadata?.email === 'string'
+      ? user.user_metadata.email
+      : user.email ?? '')
+  const isWrongAccount =
+    Boolean(user.email) &&
+    Boolean(invitedEmail) &&
+    user.email?.toLowerCase() !== invitedEmail.toLowerCase()
 
   async function handleAccept(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -19,6 +29,13 @@ export default function InvitePage({ user }: { user: User }) {
 
     if (!inviteId) {
       setMessage('This invitation link is missing its invitation details.')
+      return
+    }
+
+    if (isWrongAccount) {
+      setMessage(
+        `This invitation is for ${invitedEmail}. Sign out and open the link with that account.`,
+      )
       return
     }
 
@@ -81,13 +98,20 @@ export default function InvitePage({ user }: { user: User }) {
 
         <form className="mt-6 space-y-4" onSubmit={handleAccept}>
           <label className="block text-sm font-medium">
-            Your email
+            Invited email
             <input
-              value={user.email ?? ''}
+              value={invitedEmail}
               readOnly
               className="mt-2 h-10 w-full cursor-not-allowed rounded-md border border-line bg-canvas px-3 text-sm text-quiet"
             />
           </label>
+
+          {isWrongAccount && (
+            <p className="text-sm text-rose-600" role="alert">
+              This browser is signed in as {user.email}. Sign out, then open
+              the invitation link using {invitedEmail}.
+            </p>
+          )}
 
           <label className="block text-sm font-medium">
             Create password
@@ -110,7 +134,7 @@ export default function InvitePage({ user }: { user: User }) {
 
           <button
             type="submit"
-            disabled={isAccepting || !inviteId}
+            disabled={isAccepting || !inviteId || isWrongAccount}
             className="w-full rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isAccepting ? 'Joining workspace...' : 'Accept invitation'}

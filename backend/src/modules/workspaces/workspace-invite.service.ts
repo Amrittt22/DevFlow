@@ -35,6 +35,12 @@ export class WorkspaceInviteAcceptanceError extends Error {
   }
 }
 
+export class WorkspaceInviteRevocationError extends Error {
+  constructor(message: string) {
+    super(message)
+  }
+}
+
 export async function createWorkspaceInvite(
   workspaceId: string,
   invitedById: string,
@@ -128,12 +134,15 @@ export async function sendWorkspaceInviteEmail(invite: {
     )
   }
 
-  const redirectTo = new URL('/invite', frontendUrl).toString()
+  const redirectUrl = new URL('/invite', frontendUrl)
+  redirectUrl.searchParams.set('inviteId', invite.id)
+  redirectUrl.searchParams.set('inviteEmail', invite.email)
+  const inviteUrl = redirectUrl.toString()
 
   const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
     invite.email,
     {
-      redirectTo,
+      redirectTo: inviteUrl,
       data: {
         devflowInviteId: invite.id,
         devflowWorkspaceId: invite.workspaceId,
@@ -143,7 +152,31 @@ export async function sendWorkspaceInviteEmail(invite: {
   )
 
   if (error) {
+    const errorMessage = error.message.toLowerCase()
+    const isExistingUserError =
+      error.code === 'email_exists' ||
+      errorMessage.includes('already been registered') ||
+      errorMessage.includes('already registered') ||
+      errorMessage.includes('user already exists') ||
+      errorMessage.includes('email already exists')
+
+    if (isExistingUserError) {
+      return {
+        emailSent: false,
+        inviteUrl,
+      }
+    }
+
+    console.error('Workspace invitation email delivery failed:', {
+      code: error.code,
+      message: error.message,
+    })
     throw new WorkspaceInviteEmailError(error.message)
+  }
+
+  return {
+    emailSent: true,
+    inviteUrl,
   }
 }
 
@@ -258,5 +291,108 @@ export async function acceptWorkspaceInvite(
     })
 
     return invite.workspace
+  })
+}
+
+export async function listWorkspaceInvites(
+  workspaceId: string,
+  userId: string,
+) {
+  const membership = await prisma.workspaceMember.findUnique({
+    where: {
+      userId_workspaceId: {
+        userId,
+        workspaceId,
+      },
+    },
+    select: {
+      role: true,
+    },
+  })
+
+  if (
+    !membership ||
+    (membership.role !== 'OWNER' && membership.role !== 'ADMIN')
+  ) {
+    throw new WorkspaceInvitePermissionError()
+  }
+
+  return prisma.workspaceInvite.findMany({
+    where: {
+      workspaceId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      status: true,
+      createdAt: true,
+      expiresAt: true,
+      acceptedAt: true,
+    },
+  })
+}
+
+export async function revokeWorkspaceInvite(
+  workspaceId: string,
+  inviteId: string,
+  userId: string,
+) {
+  return prisma.$transaction(async (transaction) => {
+    const membership = await transaction.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+      select: {
+        role: true,
+      },
+    })
+
+    if (
+      !membership ||
+      (membership.role !== 'OWNER' && membership.role !== 'ADMIN')
+    ) {
+      throw new WorkspaceInvitePermissionError()
+    }
+
+    const invite = await transaction.workspaceInvite.findFirst({
+      where: {
+        id: inviteId,
+        workspaceId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    })
+
+    if (!invite) {
+      throw new WorkspaceInviteNotFoundError()
+    }
+
+    if (invite.status !== 'PENDING') {
+      throw new WorkspaceInviteRevocationError(
+        'Only pending invitations can be revoked',
+      )
+    }
+
+    return transaction.workspaceInvite.update({
+      where: {
+        id: invite.id,
+      },
+      data: {
+        status: 'REVOKED',
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    })
   })
 }
