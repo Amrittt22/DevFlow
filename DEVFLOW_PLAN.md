@@ -2,11 +2,11 @@
 
 ## Product goal
 
-DevFlow is a full-stack collaboration platform where software teams can plan projects, organize tasks, track issues, coordinate sprints, and see how work progresses.
+DevFlow is a full-stack collaboration platform where software teams can plan projects, organize tasks, track issues, coordinate sprints, and monitor project progress.
 
 ## Current progress
 
-The foundation is complete and the project is approximately **55% complete** against this expanded plan.
+The project is approximately **60% complete** against the expanded roadmap.
 
 ### Completed
 
@@ -17,28 +17,30 @@ The foundation is complete and the project is approximately **55% complete** aga
 - Project creation, loading, selection, and browser persistence.
 - Task creation, loading, editing, deletion, priorities, and due dates.
 - Todo, In Progress, and Done task board.
-- Drag-and-drop task status changes that persist in the database.
+- Drag-and-drop task status changes persisted in the database.
 - Task List view.
 - Calendar view with due-date navigation and task editing.
 - Task search and filters for status, priority, and due dates.
 - Reusable workspace labels with custom names and colors.
-- Create labels from task forms and assign or remove labels from tasks.
+- Creating labels from task forms and assigning or removing labels from tasks.
 - Labels displayed in Board, List, and Calendar views.
-- Task-label authorization checks ensure labels belong to the task workspace.
+- Task-label authorization checks ensuring labels belong to the task workspace.
 - Task assignments backed by a many-to-many `TaskAssignee` relationship.
 - Workspace-member API for listing valid task assignees.
-- Assignment validation that prevents assigning users outside the task workspace.
+- Assignment validation preventing assignments outside the task workspace.
 - Assignee selection in create-task and edit-task forms.
 - Assignee initials displayed in Board, List, and Calendar views.
-- Task assignments persist after refresh.
+- Task assignments persisted after refresh.
 - Workspace invitation model with expiry, roles, sender, status, and acceptance tracking.
-- Owner/Admin permission checks for invitation creation.
-- Supabase invitation-email delivery and secure invitation acceptance flow.
+- Owner/Admin permission checks for invitation creation and management.
+- Supabase invitation-email delivery and secure invitation acceptance.
 - Invitation listing, resend, revoke, and copyable links for existing Supabase users.
+- Dedicated workspace member-management functionality.
+- Workspace member-management authorization checks tested.
 - Workspace, project, and active-tab persistence after browser refresh.
-- Frontend refactor: separated app types, data hooks, task views, and modal components.
-- Frontend and backend production builds pass after the refactor.
+- Frontend refactor separating app types, data hooks, task views, and modal components.
 - Responsive Tailwind interface with light and dark modes.
+- Frontend and backend production builds passed after the earlier refactor.
 
 ## Core user journey
 
@@ -47,15 +49,16 @@ Sign in
 → Create or select a workspace
 → Create or select a project
 → Create, label, assign, prioritize, schedule, edit, delete, and complete tasks
-→ Invite members to collaborate in the workspace
+→ Manage workspace members and invitations
 → Collaborate through comments and activity
 → Plan work in sprints and track progress
+→ Connect GitHub repositories and track development activity
 ```
 
 ## Technology stack
 
-| Area | Choice |
-| --- | --- |
+| Area | Technology |
+|---|---|
 | Frontend | React, TypeScript, Vite, Tailwind CSS |
 | Backend | Node.js, Express, TypeScript, REST API |
 | Authentication | Supabase Auth |
@@ -63,8 +66,8 @@ Sign in
 | ORM | Prisma 7 Client with PostgreSQL driver adapter |
 | Validation | Zod |
 | Caching and background jobs | Redis |
-| Future local environment | Docker and Docker Compose |
-| Future continuous integration | GitHub Actions |
+| Containerization | Docker and Docker Compose |
+| Continuous integration | GitHub Actions |
 
 ## Phase 1 — Complete task management
 
@@ -98,34 +101,36 @@ A team can create, find, assign, prioritize, schedule, edit, delete, and complet
 - [x] Add a frontend invitation-acceptance page.
 - [x] Add invited users to the correct workspace after acceptance.
 - [x] Add invitation listing, resend, revoke, and copyable links for existing users.
+- [x] Test the complete email invitation flow with a second account.
+- [x] Build a dedicated workspace member-management screen.
+- [x] List pending invitations.
+- [x] Resend and revoke invitations.
+- [x] Test workspace member-management authorization and access control.
 
 ### Remaining
 
-- [x] Test the complete email invitation flow with a second account.
-- [ ] Show workspace members in a dedicated management screen.
-- [x] List pending invitations.
-- [x] Resend, revoke, and manage invitations.
 - [ ] Allow role changes for existing workspace members.
-- Add project membership where it improves access control.
-- Add task comments.
-- Record activity for task creation, edits, status changes, assignments, comments, and deletion.
-- Add in-app notifications for assignments, comments, and approaching due dates.
-- Add real-time task, comment, and notification updates for active workspace members.
+- [ ] Add safe member removal with appropriate ownership protections.
+- [ ] Add project membership where it improves access control.
+- [ ] Add task comments.
+- [ ] Record activity for task creation, edits, status changes, assignments, comments, and deletion.
+- [ ] Add in-app notifications for assignments, comments, and approaching due dates.
+- [ ] Add real-time task, comment, and notification updates for active workspace members.
 
 ### Exit check
 
-Multiple users can collaborate in the same workspace with clear ownership, role checks, and a visible history of changes.
+Multiple users can collaborate in the same workspace with clear ownership, role checks, member management, and a visible history of changes.
 
 ## Phase 3 — Planning views and sprints
 
 ### Goals
 
-- Finish the Calendar view.
-- Build a Timeline view.
-- Create sprints with start and end dates.
-- Add tasks to sprints.
-- Show sprint progress: Todo, In Progress, Done, and remaining work.
-- Build a project overview with open, completed, overdue, and recent work.
+- [ ] Finish and polish the Calendar view.
+- [ ] Build a Timeline view.
+- [ ] Create sprints with start and end dates.
+- [ ] Add tasks to sprints.
+- [ ] Show sprint progress: Todo, In Progress, Done, and remaining work.
+- [ ] Build a project overview showing open, completed, overdue, and recent work.
 
 ### Exit check
 
@@ -135,10 +140,10 @@ A team can plan a sprint and understand project progress from the dashboard.
 
 ### Goals
 
-- Add issues separately from regular tasks.
-- Support issue title, description, status, priority, labels, reporter, and assignee.
-- Add issue comments and activity history.
-- Link related issues and tasks.
+- [ ] Add issues separately from regular tasks.
+- [ ] Support issue title, description, status, priority, labels, reporter, and assignee.
+- [ ] Add issue comments and activity history.
+- [ ] Link related issues and tasks.
 
 ### Exit check
 
@@ -148,14 +153,15 @@ A user can report, discuss, assign, and resolve an issue with a complete audit t
 
 ### Goals
 
-- Standardize API error responses.
-- Add validation and authorization checks for every protected route.
-- Add task pagination, filtering, and sorting on the server where needed.
-- Improve keyboard navigation, labels, focus states, and mobile layouts.
-- Add frontend empty, loading, retry, and error states.
-- Add unit tests for validation and service rules.
-- Add API integration tests for authentication and workspace permissions.
-- Add browser flow tests for the main user journey.
+- [ ] Standardize API error responses.
+- [ ] Add validation and authorization checks for every protected route.
+- [ ] Add server-side task pagination, filtering, and sorting where needed.
+- [ ] Improve keyboard navigation, labels, focus states, and mobile layouts.
+- [ ] Improve frontend empty, loading, retry, and error states.
+- [ ] Add unit tests for validation and service rules.
+- [ ] Add API integration tests for authentication and workspace permissions.
+- [ ] Add browser flow tests for the main user journey.
+- [ ] Verify correct behavior for PATCH and DELETE operations, including unauthorized requests and invalid resource IDs.
 
 ### Exit check
 
@@ -165,32 +171,32 @@ The main user journey is reliable, accessible, tested, and easy to demonstrate.
 
 ### Docker goals
 
-- Learn containers, images, ports, volumes, and environment variables.
-- Create a Dockerfile for the frontend.
-- Create a Dockerfile for the backend.
-- Add Docker Compose for reproducible local development with frontend, backend, and Redis services.
+- [ ] Learn containers, images, ports, volumes, and environment variables.
+- [ ] Create a Dockerfile for the frontend.
+- [ ] Create a Dockerfile for the backend.
+- [ ] Add Docker Compose for reproducible local development with frontend, backend, and Redis where needed.
 
 ### Redis goals
 
-- Learn Redis keys, expiry times, and in-memory data storage.
-- Add API rate limiting for sensitive and frequently used endpoints.
-- Add a background-job queue for assignment, comment, and due-date notifications.
-- Keep notification work out of the main API request so users receive faster responses.
-- Add dashboard caching only after measuring a slow or frequently repeated query.
+- [ ] Learn Redis keys, expiry times, and in-memory data storage.
+- [ ] Add API rate limiting for sensitive and frequently used endpoints.
+- [ ] Add a background-job queue for assignment, comment, and due-date notifications.
+- [ ] Keep notification work out of the main API request so users receive faster responses.
+- [ ] Add dashboard caching only after measuring a slow or frequently repeated query.
 
 ### GitHub Actions goals
 
-- Learn continuous integration workflows.
-- Run frontend and backend builds automatically for every push and pull request.
-- Run tests automatically after they are added.
-- Learn how to read and fix failed workflow logs.
+- [ ] Learn continuous integration workflows.
+- [ ] Run frontend and backend builds automatically for every push and pull request.
+- [ ] Run tests automatically after they are added.
+- [ ] Learn how to read and fix failed workflow logs.
 
 ### Deployment goals
 
-- Deploy the frontend and backend.
-- Configure production environment variables and database migrations.
-- Add health checks and basic monitoring.
-- Publish setup instructions, screenshots, and a project walkthrough.
+- [ ] Deploy the frontend and backend.
+- [ ] Configure production environment variables and database migrations.
+- [ ] Add health checks and basic monitoring.
+- [ ] Publish setup instructions, screenshots, and a project walkthrough.
 
 ### Exit check
 
@@ -200,11 +206,11 @@ A reviewer can clone, build, test, and run DevFlow consistently, then access a d
 
 ### Goals
 
-- Connect a workspace or project to a GitHub repository.
-- Link tasks and issues to pull requests.
-- Show pull request status, branch, author, and review state in DevFlow.
-- Receive verified GitHub webhooks for pull request and issue updates.
-- Record GitHub events in the DevFlow activity history.
+- [ ] Connect a workspace or project to a GitHub repository.
+- [ ] Link tasks and issues to pull requests.
+- [ ] Show pull request status, branch, author, and review state in DevFlow.
+- [ ] Receive verified GitHub webhooks for pull request and issue updates.
+- [ ] Record GitHub events in the DevFlow activity history.
 
 ### Exit check
 
@@ -212,9 +218,12 @@ A team can connect a repository and track related pull request work from DevFlow
 
 ## Later milestone — AI features
 
-AI features begin only after the core application, real-time collaboration, and GitHub integration are stable.
+AI development begins after the core application, real-time collaboration, and GitHub integration are stable.
 
-- AI task suggestions, issue breakdowns, pull request summaries, and release-note drafts.
+- [ ] Add AI task suggestions.
+- [ ] Generate issue breakdowns.
+- [ ] Summarize pull requests.
+- [ ] Draft release notes.
 
 ## Working rules
 
@@ -222,5 +231,6 @@ AI features begin only after the core application, real-time collaboration, and 
 - Never expose Supabase secrets or database credentials in the frontend or Git history.
 - Use Prisma migrations as the source of truth for database changes.
 - Add database indexes for frequently queried relationships and filters.
-- Build and verify frontend and backend after each completed feature.
-- Update the README whenever user-facing functionality or setup steps change.
+- Build and verify the frontend and backend after each completed feature.
+- Test authorization for all sensitive mutations, especially PATCH and DELETE operations.
+- Update README.md and DEVFLOW_PLAN.md whenever user-facing functionality or setup steps change.
