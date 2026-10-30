@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import type { WorkspaceRole } from '../app/types'
 
 type BackendUser = {
   id: string
@@ -53,7 +54,7 @@ export type Workspace = {
   name: string
   slug: string
   createdAt?: string
-  role?: string
+  role?: WorkspaceRole
 }
 
 type CreateWorkspaceResponse = {

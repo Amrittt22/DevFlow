@@ -4,8 +4,13 @@ import {
   createWorkspace,
   listWorkspacesForUser,
   listWorkspaceMembers,
+  updateWorkspaceMemberRole,
+  removeWorkspaceMember,
+  WorkspaceMemberNotFoundError,
+  WorkspaceMemberPermissionError,
+  WorkspaceOwnerProtectionError,
 } from '../modules/workspaces/workspace.service.js'
-import { createWorkspaceSchema } from '../modules/workspaces/workspace.schemas.js'
+import { createWorkspaceSchema,updateWorkspaceMemberRoleSchema} from '../modules/workspaces/workspace.schemas.js'
 import { createWorkspaceInviteSchema } from '../modules/workspaces/workspace-invite.schemas.js'
 import {
   acceptWorkspaceInvite,
@@ -98,6 +103,120 @@ workspaceRouter.get(
     }
   },
 )
+
+workspaceRouter.patch(
+  '/:workspaceId/members/:userId',
+  requireAuth,
+  async (request, response) => {
+    const { workspaceId, userId } = request.params
+
+    if (
+      typeof workspaceId !== 'string' ||
+      typeof userId !== 'string'
+    ) {
+      response.status(400).json({
+        error: 'A valid workspace ID and user ID are required',
+      })
+      return
+    }
+
+    const result = updateWorkspaceMemberRoleSchema.safeParse(
+      request.body,
+    )
+
+    if (!result.success) {
+      response.status(400).json({
+        error: 'Invalid member role',
+        details: result.error.flatten().fieldErrors,
+      })
+      return
+    }
+
+    try {
+      const member = await updateWorkspaceMemberRole(
+        workspaceId,
+        userId,
+        response.locals.authUser.id,
+        result.data.role,
+      )
+
+      response.status(200).json({ member })
+    } catch (error) {
+      if (error instanceof WorkspaceMemberPermissionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceOwnerProtectionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceMemberNotFoundError) {
+        response.status(404).json({ error: error.message })
+        return
+      }
+
+      console.error('Workspace member role update failed:', error)
+
+      response.status(500).json({
+        error: 'Unable to update workspace member role',
+      })
+    }
+  },
+)
+
+
+
+workspaceRouter.delete(
+  '/:workspaceId/members/:userId',
+  requireAuth,
+  async (request, response) => {
+    const { workspaceId, userId } = request.params
+
+    if (
+      typeof workspaceId !== 'string' ||
+      typeof userId !== 'string'
+    ) {
+      response.status(400).json({
+        error: 'A valid workspace ID and user ID are required',
+      })
+      return
+    }
+
+    try {
+      const removed = await removeWorkspaceMember(
+        workspaceId,
+        userId,
+        response.locals.authUser.id,
+      )
+
+      response.status(200).json({ removed })
+    } catch (error) {
+      if (error instanceof WorkspaceMemberPermissionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceOwnerProtectionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceMemberNotFoundError) {
+        response.status(404).json({ error: error.message })
+        return
+      }
+
+      console.error('Workspace member removal failed:', error)
+
+      response.status(500).json({
+        error: 'Unable to remove workspace member',
+      })
+    }
+  },
+)
+
 
 workspaceRouter.get(
   '/:workspaceId/invites',

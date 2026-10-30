@@ -10,8 +10,9 @@ import { useTaskData } from '../hooks/useTaskData'
 import { useLabelData } from '../hooks/useLabelData'
 import { useWorkspaceMembers } from '../hooks/useWorkspaceMembers'
 import { useWorkspaceInvites } from '../hooks/useWorkspaceInvites'
-import type { Task, TaskStatus } from './types'
+import type { Task, TaskStatus, WorkspaceMember } from './types'
 import { TaskBoard, TaskCalendar, TaskFilterBar, TaskList } from '../components/tasks/TaskViews'
+import WorkspaceMembersPanel from '../components/workspaces/WorkspaceMembersPanel'
 import { CreateTaskModal, EditTaskModal, InvitationLinkModal, ProjectModal, WorkspaceModal , InviteMemberModal,WorkspaceInvitesModal} from '../components/modals/TaskModals'
 import InvitePage from '../features/invites/InvitePage'
 import { apiRequest } from '../lib/api'
@@ -21,6 +22,7 @@ const tabs = [
   { label: 'List', icon: List },
   { label: 'Board', icon: FolderKanban },
   { label: 'Calendar', icon: CalendarDays },
+  { label: 'Members', icon: Users },
 ]
 
 export default function App() {
@@ -142,6 +144,45 @@ export default function App() {
     }
   }
 
+  async function changeMemberRole(
+    userId: string,
+    role: 'ADMIN' | 'MEMBER',
+  ) {
+    try {
+      const updated = await member.updateMemberRole(userId, role)
+      notify(
+        `${updated.displayName || updated.email} is now ${role.toLowerCase()}`,
+      )
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : 'Could not update member role',
+      )
+      await member.refreshMembers()
+    }
+  }
+
+  async function removeWorkspaceMember(target: WorkspaceMember) {
+    const confirmed = window.confirm(
+      `Remove ${target.displayName || target.email} from this workspace? ` +
+        'Their assignments in this workspace will also be cleared.',
+    )
+
+    if (!confirmed) return
+
+    try {
+      await member.removeMember(target.id)
+      notify(`${target.email} was removed from the workspace`)
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : 'Could not remove workspace member',
+      )
+    }
+  }
+
   async function updateEditingTask(input: Partial<Task>) {
     if (!editingTask) return
     try {
@@ -237,6 +278,17 @@ if (isInvitePage) {
           {activeTab === 'List' && <TaskList tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onEdit={openTaskEditor} />}
           {activeTab === 'Calendar' && <TaskCalendar tasks={task.tasks} loading={task.isLoadingTasks} hasProject={Boolean(workspace.activeProject)} onEdit={openTaskEditor} />}
           {activeTab === 'Overview' && <Overview tasks={task.tasks} onCreate={() => setTaskModalOpen(true)} />}
+          {activeTab === 'Members' && (
+            <WorkspaceMembersPanel
+              workspaceName={workspace.activeWorkspace?.name}
+              actorRole={workspace.activeWorkspace?.role}
+              members={member.members}
+              loading={member.isLoadingMembers}
+              updating={member.isUpdatingMember}
+              onRoleChange={changeMemberRole}
+              onRemove={removeWorkspaceMember}
+            />
+          )}
         </div>
       </main>
     </div>
