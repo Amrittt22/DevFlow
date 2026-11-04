@@ -92,6 +92,7 @@ Sign in
 - [x] Record task creation, edits, status changes, assignments, labels, and deletion in task activity history.
 - [x] Add an authenticated task activity API.
 - [x] Add the frontend task activity timeline to task details and task list/card entry points.
+- [x] Add the project overview dashboard.
 
 ### Remaining
 
@@ -121,8 +122,8 @@ A team can create, find, assign, prioritize, schedule, edit, delete, and complet
 
 ### Remaining
 
-- [ ] Allow role changes for existing workspace members.
-- [ ] Add safe member removal with appropriate ownership protections.
+- [x] Allow role changes for existing workspace members.
+- [x] Add safe member removal with appropriate ownership protections.
 - [ ] Add project membership where it improves access control.
 - [ ] Add task comments.
 - [ ] Record activity for task comments.
@@ -168,8 +169,7 @@ A user can report, discuss, assign, and resolve an issue with a complete audit t
 - [ ] Standardize API error responses.
 - [ ] Add validation and authorization checks for every protected route.
 - [ ] Add server-side task pagination, filtering, and sorting where needed.
-- [ ] Improve keyboard navigation, labels, focus states, and mobile layouts.
-- [ ] Improve frontend empty, loading, retry, and error states.
+- [x] Improve frontend empty, loading, retry, and error states.
 - [ ] Add unit tests for validation and service rules.
 - [ ] Add API integration tests for authentication and workspace permissions.
 - [ ] Add browser flow tests for the main user journey.
