@@ -8,6 +8,7 @@ import {
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [isResetRequest, setIsResetRequest] = useState(false)
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
@@ -21,7 +22,7 @@ export default function AuthPage() {
     const { error } = isResetRequest
       ? await requestPasswordReset(email)
       : isSignUp
-        ? await signUp(email, password)
+        ? await signUp(email, password, fullName)
         : await signIn(email, password)
 
     setIsLoading(false)
@@ -61,6 +62,22 @@ export default function AuthPage() {
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          {isSignUp && (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Full name
+              </span>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                type="text"
+                autoComplete="name"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+              />
+            </label>
+          )}
+
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Email

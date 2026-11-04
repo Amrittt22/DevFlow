@@ -8,9 +8,11 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Responsive React dashboard built with TypeScript and Tailwind CSS.
 - Light and dark themes.
 - Supabase email sign-up, sign-in, session tracking, and sign-out.
+- Signup stores the user's trimmed `full_name` in Supabase metadata.
 - Password recovery with a dedicated `/reset-password` page.
 - Express API with server-side Supabase bearer-token verification.
 - Protected backend routes with workspace-scoped authorization.
+- Authenticated user profiles are available through `/api/v1/auth/me`.
 
 ### Workspaces and Projects
 - Create and list workspaces.
@@ -35,6 +37,9 @@ DevFlow is a full-stack collaboration platform for software teams to create work
 - Display assignee initials in Board, List, and Calendar views.
 - Validate that task assignees and labels belong to the task's workspace.
 - Persist task assignments and labels after refresh.
+- Persistent task activity history for creation, updates, status changes, label changes, assignee changes, and deletion.
+- Activity timeline with actor names, timestamps, status badges, loading, empty, error, and refresh states.
+- Responsive activity UI with light and dark mode support.
 
 ### Workspace Invitations
 - Invite workspace members by email.
@@ -66,6 +71,7 @@ Sign in
   → View tasks in Board, List, or Calendar
   → Search and filter tasks
   → Edit, delete, assign, label, or move tasks between statuses
+  → Review task activity history from task cards or the task list
 ```
 
 ## Project Layout
@@ -199,6 +205,73 @@ The API should verify authentication and enforce workspace membership and role p
 | POST | `/api/v1/projects/:projectId/tasks` | Create a task | Authorized project/workspace member |
 | PATCH | `/api/v1/tasks/:taskId` | Partially update task details, status, priority, or due date | Authorized workspace member |
 | DELETE | `/api/v1/tasks/:taskId` | Delete a task | Authorized workspace member |
+| GET | `/api/v1/tasks/:taskId/activity` | Retrieve the task's activity history | Authorized workspace member |
+
+### Task Activity History
+
+Task activity records are persisted in PostgreSQL through Prisma. The backend records:
+
+- Task creation.
+- General task updates.
+- Status changes with previous and new values.
+- Label changes.
+- Assignee changes.
+- Task deletion history.
+- Actor information and creation timestamps.
+
+The authenticated endpoint returns the most recent 100 activities in descending chronological order. It requires the same Supabase access token as other protected endpoints:
+
+```http
+GET /api/v1/tasks/:taskId/activity
+Authorization: Bearer <supabase-access-token>
+```
+
+Example response:
+
+```json
+{
+  "activities": [
+    {
+      "id": "activity_id",
+      "taskId": "task_id",
+      "projectId": "project_id",
+      "actorId": "user_id",
+      "type": "STATUS_CHANGED",
+      "details": {
+        "changes": {
+          "status": {
+            "from": "TODO",
+            "to": "IN_PROGRESS"
+          }
+        }
+      },
+      "createdAt": "2026-11-03T19:24:58.267Z",
+      "actor": {
+        "id": "user_id",
+        "displayName": "Amritanshu Singh"
+      }
+    }
+  ]
+}
+```
+
+The `actor` value may be `null` if the original user profile was removed. The frontend displays `Unknown user` in that case and provides a timeline with relative timestamps, absolute timestamps on hover, responsive layout, and light/dark theme support.
+
+### Authentication and User Profiles
+
+- Supabase signup stores `full_name` metadata from the full-name form field.
+- Workspace creation and invitation acceptance synchronize the Supabase user's metadata into the Prisma `displayName` profile field without overwriting an existing name with `null`.
+- `GET /api/v1/auth/me` returns the authenticated Prisma profile:
+
+```json
+{
+  "user": {
+    "id": "user_id",
+    "email": "user@example.com",
+    "displayName": "Amritanshu Singh"
+  }
+}
+```
 
 ### Labels
 
@@ -359,7 +432,7 @@ The following are future enhancements, not claims that the corresponding functio
 
 - Change roles of existing workspace members.
 - Safely remove members from a workspace.
-- Task comments and task activity history.
+- Task comments.
 - Notifications for assignments, comments, and due dates.
 - Real-time task, comment, and notification updates.
 - Improved task sorting and accessibility.

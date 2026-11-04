@@ -192,6 +192,13 @@ export async function acceptWorkspaceInvite(
     )
   }
 
+  const metadataName =
+    typeof authUser.user_metadata?.full_name === 'string'
+      ? authUser.user_metadata.full_name
+      : typeof authUser.user_metadata?.name === 'string'
+        ? authUser.user_metadata.name
+        : null
+
   return prisma.$transaction(async (transaction) => {
     const invite = await transaction.workspaceInvite.findUnique({
       where: {
@@ -251,14 +258,12 @@ export async function acceptWorkspaceInvite(
       },
       update: {
         email,
+        ...(metadataName ? { displayName: metadataName } : {}),
       },
       create: {
         id: authUser.id,
         email,
-        displayName:
-          typeof authUser.user_metadata?.full_name === 'string'
-            ? authUser.user_metadata.full_name
-            : null,
+        displayName: metadataName,
       },
       select: {
         id: true,

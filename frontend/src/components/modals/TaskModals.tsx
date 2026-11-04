@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import type { Label, Task, TaskPriority, TaskStatus , WorkspaceMember} from '../../app/types'
 import type { WorkspaceInvite } from '../../hooks/useWorkspaceInvites'
+import TaskActivityTimeline from '../tasks/TaskActivityTimeline'
 
 function Modal({ children }: { children: ReactNode }) {
   return <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4">{children}</div>
@@ -563,9 +564,176 @@ export function CreateTaskModal({
   )
 }
 
-export function EditTaskModal({ task, updating, deleting, labels, selectedLabelIds, onToggleLabel, members, selectedAssigneeIds, onToggleAssignee, isLoadingMembers, onClose, onUpdate, onDelete, ...labelProps }: { task: Task | null; updating: boolean; deleting: boolean; labels: Label[]; selectedLabelIds: string[]; onToggleLabel: (id: string) => void; onClose: () => void; onUpdate: (input: Partial<Task>) => Promise<void>; onDelete: () => Promise<void> } & TaskFormLabels & TaskFormAssignees) {
-  const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [status, setStatus] = useState<TaskStatus>('TODO'); const [priority, setPriority] = useState<TaskPriority>('MEDIUM'); const [dueDate, setDueDate] = useState('')
-  useEffect(() => { if (task) { setTitle(task.title); setDescription(task.description ?? ''); setStatus(task.status); setPriority(task.priority); setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '') } }, [task])
+type EditTaskModalProps = {
+  task: Task | null
+  initialSection?: 'details' | 'activity'
+  updating: boolean
+  deleting: boolean
+  labels: Label[]
+  selectedLabelIds: string[]
+  onToggleLabel: (id: string) => void
+  onClose: () => void
+  onUpdate: (input: Partial<Task>) => Promise<void>
+  onDelete: () => Promise<void>
+} & TaskFormLabels &
+  TaskFormAssignees
+
+export function EditTaskModal({
+  task,
+  initialSection = 'details',
+  updating,
+  deleting,
+  labels,
+  selectedLabelIds,
+  onToggleLabel,
+  members,
+  selectedAssigneeIds,
+  onToggleAssignee,
+  isLoadingMembers,
+  onClose,
+  onUpdate,
+  onDelete,
+  ...labelProps
+}: EditTaskModalProps) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [status, setStatus] = useState<TaskStatus>('TODO')
+  const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
+  const [dueDate, setDueDate] = useState('')
+  const [section, setSection] = useState<'details' | 'activity'>('details')
+
+  useEffect(() => {
+    if (!task) return
+    setSection(initialSection)
+    setTitle(task.title)
+    setDescription(task.description ?? '')
+    setStatus(task.status)
+    setPriority(task.priority)
+    setDueDate(
+      task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '',
+    )
+  }, [initialSection, task])
+
   if (!task) return null
-  return <Modal><form onSubmit={(event) => { event.preventDefault(); void onUpdate({ title, description: description || null, status, priority, dueDate: dueDate ? new Date(dueDate).toISOString() : null }).then(onClose) }} className="w-full max-w-md rounded-xl border border-line bg-panel p-5 shadow-xl"><Header title="Edit task" subtitle="Update the task details and progress." onClose={onClose} /><label className="mt-5 block text-sm font-medium">Task title<input autoFocus minLength={2} maxLength={160} required value={title} onChange={(event) => setTitle(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm outline-none focus:border-brand" /></label><label className="mt-4 block text-sm font-medium">Description<textarea maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-2 min-h-20 w-full resize-y rounded-md border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand" /></label><Choices status={status} priority={priority} onStatus={setStatus} onPriority={setPriority} /><label className="mt-4 block text-sm font-medium">Due date<input type="datetime-local" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm outline-none focus:border-brand" /></label><LabelPicker labels={labels} selectedLabelIds={selectedLabelIds} onToggle={onToggleLabel} {...labelProps} /><AssigneePicker members={members} selectedUserIds={selectedAssigneeIds} onToggle={onToggleAssignee} isLoading={isLoadingMembers} /><div className="mt-5 flex justify-between"><button type="button" onClick={() => void onDelete()} disabled={deleting} className="text-sm font-semibold text-rose-600">{deleting ? 'Deleting…' : 'Delete task'}</button><Actions loading={updating} label="Save changes" onCancel={onClose} /></div></form></Modal>
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await onUpdate({
+      title,
+      description: description || null,
+      status,
+      priority,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+    })
+    onClose()
+  }
+
+  return (
+    <Modal>
+      <form
+        onSubmit={(event) => void submit(event)}
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-line bg-panel p-5 shadow-xl"
+      >
+        <Header
+          title="Edit task"
+          subtitle="Update the task details and progress."
+          onClose={onClose}
+        />
+        <div className="mt-5 flex border-b border-line" role="tablist">
+          {(['details', 'activity'] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={section === item}
+              onClick={() => setSection(item)}
+              className={`border-b-2 px-3 py-2 text-xs font-semibold capitalize ${
+                section === item
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-quiet'
+              }`}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+
+        {section === 'details' ? (
+          <>
+            <label className="mt-5 block text-sm font-medium">
+              Task title
+              <input
+                autoFocus
+                minLength={2}
+                maxLength={160}
+                required
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm outline-none focus:border-brand"
+              />
+            </label>
+            <label className="mt-4 block text-sm font-medium">
+              Description
+              <textarea
+                maxLength={2000}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                className="mt-2 min-h-20 w-full resize-y rounded-md border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand"
+              />
+            </label>
+            <Choices
+              status={status}
+              priority={priority}
+              onStatus={setStatus}
+              onPriority={setPriority}
+            />
+            <label className="mt-4 block text-sm font-medium">
+              Due date
+              <input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="mt-2 h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm outline-none focus:border-brand"
+              />
+            </label>
+            <LabelPicker
+              labels={labels}
+              selectedLabelIds={selectedLabelIds}
+              onToggle={onToggleLabel}
+              {...labelProps}
+            />
+            <AssigneePicker
+              members={members}
+              selectedUserIds={selectedAssigneeIds}
+              onToggle={onToggleAssignee}
+              isLoading={isLoadingMembers}
+            />
+            <div className="mt-5 flex justify-between">
+              <button
+                type="button"
+                onClick={() => void onDelete()}
+                disabled={deleting}
+                className="text-sm font-semibold text-rose-600"
+              >
+                {deleting ? 'Deleting…' : 'Delete task'}
+              </button>
+              <Actions
+                loading={updating}
+                label="Save changes"
+                onCancel={onClose}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="mt-5">
+            <TaskActivityTimeline
+              taskId={task.id}
+              labels={labels}
+              members={members}
+            />
+          </div>
+        )}
+      </form>
+    </Modal>
+  )
 }

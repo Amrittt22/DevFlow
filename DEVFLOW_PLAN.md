@@ -31,6 +31,15 @@ The project is approximately **60% complete** against the expanded roadmap.
 - Assignee selection in create-task and edit-task forms.
 - Assignee initials displayed in Board, List, and Calendar views.
 - Task assignments persisted after refresh.
+- Task Activity database model and PostgreSQL migration.
+- Generated Prisma Client support for task activity.
+- Authenticated task activity API with workspace membership checks.
+- Activity event recording for task creation, updates, status changes, labels, assignees, and deletion.
+- Activity actor information and display-name handling.
+- Supabase and Prisma user profile synchronization during workspace creation and invitation acceptance.
+- Signup full-name metadata and authenticated user profile endpoint.
+- Frontend Task Activity Timeline with loading, empty, error, retry, and refresh states.
+- Frontend and backend production builds passed after the task activity implementation.
 - Workspace invitation model with expiry, roles, sender, status, and acceptance tracking.
 - Owner/Admin permission checks for invitation creation and management.
 - Supabase invitation-email delivery and secure invitation acceptance.
@@ -80,6 +89,9 @@ Sign in
 - [x] Improve task loading, empty, error, and confirmation states.
 - [x] Preserve the selected workspace, project, and view after refresh.
 - [x] Add task assignment to workspace members.
+- [x] Record task creation, edits, status changes, assignments, labels, and deletion in task activity history.
+- [x] Add an authenticated task activity API.
+- [x] Add the frontend task activity timeline to task details and task list/card entry points.
 
 ### Remaining
 
@@ -113,7 +125,7 @@ A team can create, find, assign, prioritize, schedule, edit, delete, and complet
 - [ ] Add safe member removal with appropriate ownership protections.
 - [ ] Add project membership where it improves access control.
 - [ ] Add task comments.
-- [ ] Record activity for task creation, edits, status changes, assignments, comments, and deletion.
+- [ ] Record activity for task comments.
 - [ ] Add in-app notifications for assignments, comments, and approaching due dates.
 - [ ] Add real-time task, comment, and notification updates for active workspace members.
 

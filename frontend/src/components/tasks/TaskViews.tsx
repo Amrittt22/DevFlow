@@ -19,6 +19,7 @@ export function LabelBadges({ labels, compact = false }: { labels: Label[]; comp
 
 type TaskActions = {
   onEdit: (task: Task) => void
+  onActivity: (task: Task) => void
 }
 
 export function AssigneeAvatars({
@@ -83,13 +84,14 @@ export function AssigneeAvatars({
   )
 }
 
-export function TaskBoard({ tasks, loading, hasProject, onCreate, onStatus, onEdit }: {
+export function TaskBoard({ tasks, loading, hasProject, onCreate, onStatus, onEdit, onActivity }: {
   tasks: Task[]
   loading: boolean
   hasProject: boolean
   onCreate: () => void
   onStatus: (id: string, status: TaskStatus) => void
   onEdit: (task: Task) => void
+  onActivity: (task: Task) => void
 }) {
   const [dragged, setDragged] = useState<string | null>(null)
   const [target, setTarget] = useState<TaskStatus | null>(null)
@@ -117,7 +119,10 @@ export function TaskBoard({ tasks, loading, hasProject, onCreate, onStatus, onEd
           <div className="mb-3 flex items-center justify-between px-1"><h3 className="flex items-center gap-2 text-xs font-semibold"><i className={`h-2 w-2 rounded-full ${dot}`} />{label}</h3><span className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-quiet">{columnTasks.length}</span></div>
           <div className="space-y-2">{columnTasks.map((task) => <article key={task.id} draggable onDragStart={() => setDragged(task.id)} onDragEnd={() => { setDragged(null); setTarget(null) }} className={`cursor-grab rounded-lg border border-line bg-panel p-3 shadow-soft ${dragged === task.id ? 'opacity-50' : ''}`}>
             <button type="button" onClick={() => onEdit(task)} className="w-full text-left"><h4 className="text-xs font-semibold">{task.title}</h4>{task.description && <p className="mt-1.5 line-clamp-2 text-[11px] text-quiet">{task.description}</p>}<span className={`mt-3 inline-flex rounded px-1.5 py-0.5 text-[9px] font-semibold ${priority[task.priority]}`}>{task.priority.toLowerCase()} priority</span><LabelBadges labels={task.labels} /><AssigneeAvatars assignees={task.assignees} /></button>
-            <select value={task.status} onChange={(event) => onStatus(task.id, event.target.value as TaskStatus)} className="mt-3 h-7 w-full rounded border border-line bg-canvas px-1.5 text-[10px] text-ink outline-none" aria-label={`Change status for ${task.title}`}><option value="TODO">Todo</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select>
+            <div className="mt-3 flex gap-2">
+              <select value={task.status} onChange={(event) => onStatus(task.id, event.target.value as TaskStatus)} className="h-7 min-w-0 flex-1 rounded border border-line bg-canvas px-1.5 text-[10px] text-ink outline-none" aria-label={`Change status for ${task.title}`}><option value="TODO">Todo</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select>
+              <button type="button" onClick={() => onActivity(task)} className="rounded border border-line px-2 text-[10px] font-semibold text-quiet hover:text-ink">Activity</button>
+            </div>
           </article>)}{!columnTasks.length && <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[10px] text-quiet">No tasks</p>}</div>
         </section>
       })}
@@ -125,11 +130,11 @@ export function TaskBoard({ tasks, loading, hasProject, onCreate, onStatus, onEd
   </section>
 }
 
-export function TaskList({ tasks, loading, hasProject, onEdit }: { tasks: Task[]; loading: boolean; hasProject: boolean; onEdit: TaskActions['onEdit'] }) {
+export function TaskList({ tasks, loading, hasProject, onEdit, onActivity }: { tasks: Task[]; loading: boolean; hasProject: boolean; onEdit: TaskActions['onEdit']; onActivity: TaskActions['onActivity'] }) {
   if (!hasProject) return <EmptyState icon={<List />} title="Select a project" text="Create or select a project to view its tasks." />
   if (loading) return <LoadingState />
   const status: Record<TaskStatus, string> = { TODO: 'bg-slate-100 text-slate-700', IN_PROGRESS: 'bg-amber-50 text-amber-700', DONE: 'bg-emerald-50 text-emerald-700' }
-  return <section className="pt-7"><h2 className="font-display text-[17px] font-bold">Task list</h2><p className="mt-1 text-[11px] text-quiet">View and edit every task in this project.</p>{tasks.length ? <div className="mt-5 overflow-x-auto rounded-xl border border-line bg-panel"><table className="w-full min-w-[700px] border-collapse text-left text-xs"><thead className="border-b border-line text-[10px] uppercase tracking-wide text-quiet"><tr>{['Task', 'Status', 'Priority', 'Due date', 'Action'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody>{tasks.map((task) => <tr key={task.id} className="border-b border-line last:border-0"><td className="max-w-[320px] px-4 py-3"><strong className="block truncate">{task.title}</strong>{task.description && <span className="mt-1 block truncate text-[10px] text-quiet">{task.description}</span>}<LabelBadges labels={task.labels} /><AssigneeAvatars assignees={task.assignees} /></td><td className="px-4 py-3"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${status[task.status]}`}>{task.status.replace('_', ' ').toLowerCase()}</span></td><td className="px-4 py-3 text-[10px]">{task.priority.toLowerCase()}</td><td className="px-4 py-3 text-[11px] text-quiet">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</td><td className="px-4 py-3 text-right"><button onClick={() => onEdit(task)} className="rounded-md border border-line px-2.5 py-1.5 text-[10px] font-semibold text-quiet">Edit</button></td></tr>)}</tbody></table></div> : <p className="mt-5 rounded-xl border border-dashed border-line p-12 text-center text-sm text-quiet">No tasks yet</p>}</section>
+  return <section className="pt-7"><h2 className="font-display text-[17px] font-bold">Task list</h2><p className="mt-1 text-[11px] text-quiet">View, edit, and review activity for every task in this project.</p>{tasks.length ? <div className="mt-5 overflow-x-auto rounded-xl border border-line bg-panel"><table className="w-full min-w-[700px] border-collapse text-left text-xs"><thead className="border-b border-line text-[10px] uppercase tracking-wide text-quiet"><tr>{['Task', 'Status', 'Priority', 'Due date', 'Action'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody>{tasks.map((task) => <tr key={task.id} className="border-b border-line last:border-0"><td className="max-w-[320px] px-4 py-3"><strong className="block truncate">{task.title}</strong>{task.description && <span className="mt-1 block truncate text-[10px] text-quiet">{task.description}</span>}<LabelBadges labels={task.labels} /><AssigneeAvatars assignees={task.assignees} /></td><td className="px-4 py-3"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${status[task.status]}`}>{task.status.replace('_', ' ').toLowerCase()}</span></td><td className="px-4 py-3 text-[10px]">{task.priority.toLowerCase()}</td><td className="px-4 py-3 text-[11px] text-quiet">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</td><td className="px-4 py-3 text-right"><div className="inline-flex gap-1.5"><button onClick={() => onEdit(task)} className="rounded-md border border-line px-2.5 py-1.5 text-[10px] font-semibold text-quiet">Edit</button><button onClick={() => onActivity(task)} className="rounded-md border border-line px-2.5 py-1.5 text-[10px] font-semibold text-quiet">Activity</button></div></td></tr>)}</tbody></table></div> : <p className="mt-5 rounded-xl border border-dashed border-line p-12 text-center text-sm text-quiet">No tasks yet</p>}</section>
 }
 
 export function TaskCalendar({ tasks, loading, hasProject, onEdit }: { tasks: Task[]; loading: boolean; hasProject: boolean; onEdit: TaskActions['onEdit'] }) {

@@ -13,6 +13,13 @@ export async function createWorkspace(
     throw new Error('Your Supabase account must have an email address')
   }
 
+  const metadataName =
+    typeof authUser.user_metadata?.full_name === 'string'
+      ? authUser.user_metadata.full_name
+      : typeof authUser.user_metadata?.name === 'string'
+        ? authUser.user_metadata.name
+        : null
+
   const slugBase =
     input.name
       .toLowerCase()
@@ -24,14 +31,14 @@ export async function createWorkspace(
   return prisma.$transaction(async (transaction) => {
     const appUser = await transaction.user.upsert({
       where: { id: authUser.id },
-      update: { email },
+      update: {
+        email,
+        ...(metadataName ? { displayName: metadataName } : {}),
+      },
       create: {
         id: authUser.id,
         email,
-        displayName:
-          typeof authUser.user_metadata?.full_name === 'string'
-            ? authUser.user_metadata.full_name
-            : null,
+        displayName: metadataName,
       },
     })
 

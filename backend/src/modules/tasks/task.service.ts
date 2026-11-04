@@ -142,6 +142,20 @@ export async function createTaskForProject(
       select: taskFields,
     })
 
+    await transaction.taskActivity.create({
+      data: {
+        taskId: task.id,
+        projectId,
+        actorId: userId,
+        type: 'TASK_CREATED',
+        details: {
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+        },
+      },
+    })
+
     return formatTask(task)
   })
 }
@@ -152,7 +166,7 @@ export async function updateTask(
   input: UpdateTaskInput,
 ) {
   return prisma.$transaction(async (transaction) => {
-    const task = await transaction.task.findFirst({
+    const existingTask = await transaction.task.findFirst({
       where: {
         id: taskId,
         project: {
@@ -163,10 +177,18 @@ export async function updateTask(
           },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+      },
     })
 
-    if (!task) {
+    if (!existingTask) {
       return null
     }
 
@@ -175,6 +197,45 @@ export async function updateTask(
       data: input,
       select: taskFields,
     })
+
+    const changes: Record<
+      string,
+      { from: string | null; to: string | null }
+    > = {}
+    for (const field of Object.keys(input) as Array<keyof UpdateTaskInput>) {
+      const oldValue = existingTask[field]
+      const newValue = updatedTask[field]
+      const from =
+        oldValue instanceof Date
+          ? oldValue.toISOString()
+          : oldValue === undefined || oldValue === null
+            ? null
+            : String(oldValue)
+      const to =
+        newValue instanceof Date
+          ? newValue.toISOString()
+          : newValue === undefined || newValue === null
+            ? null
+            : String(newValue)
+
+      if (from !== to) {
+        changes[field] = { from, to }
+      }
+    }
+
+    if (Object.keys(changes).length > 0) {
+      const type =
+        changes.status !== undefined ? 'STATUS_CHANGED' : 'TASK_UPDATED'
+      await transaction.taskActivity.create({
+        data: {
+          taskId,
+          projectId: existingTask.projectId,
+          actorId: userId,
+          type,
+          details: { changes },
+        },
+      })
+    }
 
     return formatTask(updatedTask)
   })
@@ -199,6 +260,12 @@ export async function setTaskLabels(
       },
       select: {
         id: true,
+        projectId: true,
+        labels: {
+          select: {
+            labelId: true,
+          },
+        },
         project: {
           select: {
             workspaceId: true,
@@ -227,6 +294,16 @@ export async function setTaskLabels(
       throw new InvalidTaskLabelsError()
     }
 
+    const previousLabelIds = task.labels.map(({ labelId }) => labelId)
+    const previousLabelIdSet = new Set(previousLabelIds)
+    const requestedLabelIdSet = new Set(labelIds)
+    const addedLabelIds = labelIds.filter(
+      (labelId) => !previousLabelIdSet.has(labelId),
+    )
+    const removedLabelIds = previousLabelIds.filter(
+      (labelId) => !requestedLabelIdSet.has(labelId),
+    )
+
     await transaction.taskLabel.deleteMany({
       where: { taskId },
     })
@@ -237,6 +314,21 @@ export async function setTaskLabels(
           taskId,
           labelId,
         })),
+      })
+    }
+
+    if (addedLabelIds.length > 0 || removedLabelIds.length > 0) {
+      await transaction.taskActivity.create({
+        data: {
+          taskId,
+          projectId: task.projectId,
+          actorId: userId,
+          type: 'LABELS_CHANGED',
+          details: {
+            addedLabelIds,
+            removedLabelIds,
+          },
+        },
       })
     }
 
@@ -268,6 +360,12 @@ export async function setTaskAssignees(
       },
       select: {
         id: true,
+        projectId: true,
+        assignees: {
+          select: {
+            userId: true,
+          },
+        },
         project: {
           select: {
             workspaceId: true,
@@ -296,6 +394,16 @@ export async function setTaskAssignees(
       throw new InvalidTaskAssigneesError()
     }
 
+    const previousUserIds = task.assignees.map(({ userId }) => userId)
+    const previousUserIdSet = new Set(previousUserIds)
+    const requestedUserIdSet = new Set(assigneeIds)
+    const addedUserIds = assigneeIds.filter(
+      (assigneeId) => !previousUserIdSet.has(assigneeId),
+    )
+    const removedUserIds = previousUserIds.filter(
+      (userId) => !requestedUserIdSet.has(userId),
+    )
+
     await transaction.taskAssignee.deleteMany({
       where: {
         taskId,
@@ -308,6 +416,21 @@ export async function setTaskAssignees(
           taskId,
           userId: assigneeId,
         })),
+      })
+    }
+
+    if (addedUserIds.length > 0 || removedUserIds.length > 0) {
+      await transaction.taskActivity.create({
+        data: {
+          taskId,
+          projectId: task.projectId,
+          actorId: userId,
+          type: 'ASSIGNEES_CHANGED',
+          details: {
+            addedUserIds,
+            removedUserIds,
+          },
+        },
       })
     }
 
@@ -324,7 +447,7 @@ export async function setTaskAssignees(
 
 export async function deleteTask(taskId: string, userId: string) {
   return prisma.$transaction(async (transaction) => {
-    const task = await transaction.task.findFirst({
+    const existingTask = await transaction.task.findFirst({
       where: {
         id: taskId,
         project: {
@@ -335,12 +458,28 @@ export async function deleteTask(taskId: string, userId: string) {
           },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+      },
     })
 
-    if (!task) {
+    if (!existingTask) {
       return false
     }
+
+    await transaction.taskActivity.create({
+      data: {
+        taskId,
+        projectId: existingTask.projectId,
+        actorId: userId,
+        type: 'TASK_DELETED',
+        details: {
+          title: existingTask.title,
+        },
+      },
+    })
 
     await transaction.task.delete({
       where: { id: taskId },

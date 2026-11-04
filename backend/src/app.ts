@@ -7,6 +7,7 @@ import taskRouter from './routes/task.routes.js'
 import workspaceRouter from './routes/workspace.routes.js'
 import taskUpdateRouter from './routes/task-update.routes.js'
 import labelRouter from './routes/label.routes.js'
+import taskActivityRouter from './routes/task-activity.routes.js'
 
 const app = express()
 
@@ -17,6 +18,7 @@ app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/workspaces', workspaceRouter)
 app.use('/api/v1/workspaces/:workspaceId/projects', projectRouter)
 app.use('/api/v1/projects/:projectId/tasks', taskRouter)
+app.use('/api/v1/tasks', taskActivityRouter)
 app.use('/api/v1/tasks', taskUpdateRouter)
 app.use('/api/v1', healthRouter)
 app.use('/api/v1/workspaces/:workspaceId/labels', labelRouter)
