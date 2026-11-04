@@ -310,15 +310,10 @@ Every assignee must belong to the task's workspace.
 | Method | Endpoint | Purpose | Access |
 |---|---|---|---|
 | GET | `/api/v1/workspaces/:workspaceId/members` | List workspace members available for task assignment | Workspace member |
+| PATCH | `/api/v1/workspaces/:workspaceId/members/:userId` | Change an existing member's role | Authorized workspace owner/admin |
+| DELETE | `/api/v1/workspaces/:workspaceId/members/:userId` | Remove a member from a workspace | Authorized workspace owner/admin |
 
-The following are **recommended endpoints if role changes and member removal have not yet been implemented**:
-
-| Method | Proposed endpoint | Purpose |
-|---|---|---|
-| PATCH | `/api/v1/workspaces/:workspaceId/members/:userId` | Change an existing member's role |
-| DELETE | `/api/v1/workspaces/:workspaceId/members/:userId` | Remove a member from a workspace |
-
-For these operations, enforce role-based authorization. For example, only permitted administrators should be able to change roles or remove members. Protect the Owner role from accidental removal or demotion, and handle ownership transfer separately if supported.
+Role changes and member removal enforce workspace authorization and protect the Owner from accidental demotion or removal.
 
 ### Workspace Invitations
 
@@ -430,8 +425,6 @@ npm run build
 
 The following are future enhancements, not claims that the corresponding functionality already exists:
 
-- Change roles of existing workspace members.
-- Safely remove members from a workspace.
 - Task comments.
 - Notifications for assignments, comments, and due dates.
 - Real-time task, comment, and notification updates.
