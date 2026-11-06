@@ -2,12 +2,22 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { prisma } from '../../config/prisma.js'
 import { supabaseAdmin } from '../../config/supabase-admin.js'
 import type { CreateWorkspaceInviteInput } from './workspace-invite.schemas.js'
+import {
+  canInviteWorkspaceRole,
+  type WorkspaceRole,
+} from './workspace-invite.authorization.js'
 
 const INVITATION_LIFETIME_MS = 60 * 60 * 1000
 
 export class WorkspaceInvitePermissionError extends Error {
   constructor() {
     super('Only workspace owners and admins can invite members')
+  }
+}
+
+export class WorkspaceInviteRolePermissionError extends Error {
+  constructor() {
+    super('Only workspace owners can invite administrators')
   }
 }
 
@@ -65,6 +75,15 @@ export async function createWorkspaceInvite(
         senderMembership.role !== 'ADMIN')
     ) {
       throw new WorkspaceInvitePermissionError()
+    }
+
+    if (
+      !canInviteWorkspaceRole(
+        senderMembership.role as WorkspaceRole,
+        input.role,
+      )
+    ) {
+      throw new WorkspaceInviteRolePermissionError()
     }
 
     const existingMember = await transaction.workspaceMember.findFirst({

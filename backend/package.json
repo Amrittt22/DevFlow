@@ -7,6 +7,10 @@
     "dev": "npm run prisma7:generate && tsx watch src/server.ts",
     "build": "npm run prisma7:generate && tsc",
     "prisma7:generate": "prisma7 generate",
+    "test": "vitest run",
+    "test:unit": "vitest run src/modules",
+    "test:integration": "vitest run src/test/integration",
+    "prisma7:test:migrate": "prisma7 migrate deploy --config prisma7.test.config.ts",
     "start": "node dist/server.js"
   },
   "dependencies": {
@@ -25,8 +29,11 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.23.1",
+    "@types/supertest": "^6.0.3",
     "prisma": "^8.0.0-rc.23",
+    "supertest": "^7.1.4",
     "tsx": "^4.19.2",
-    "typescript": "~5.6.2"
+    "typescript": "~5.6.2",
+    "vitest": "^3.2.4"
   }
 }

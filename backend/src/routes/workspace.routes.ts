@@ -21,6 +21,7 @@ import {
   WorkspaceInviteEmailError,
   WorkspaceInviteNotFoundError,
   WorkspaceInvitePermissionError,
+  WorkspaceInviteRolePermissionError,
   listWorkspaceInvites,
   revokeWorkspaceInvite,
   WorkspaceInviteRevocationError,
@@ -332,6 +333,11 @@ workspaceRouter.post(
       response.status(201).json({ invite, ...delivery })
     } catch (error) {
       if (error instanceof WorkspaceInvitePermissionError) {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      if (error instanceof WorkspaceInviteRolePermissionError) {
         response.status(403).json({ error: error.message })
         return
       }
